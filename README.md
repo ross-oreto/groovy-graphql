@@ -1,4 +1,7 @@
 # groovy-graphql
+[![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/ross-oreto/groovy-graphql/master/LICENSE)
+[![Build Status](https://travis-ci.org/ross-oreto/groovy-graphql.svg?branch=master)](https://travis-ci.org/ross-oreto/groovy-graphql)
+
 Graphql schema integration with groovy and GORM.
 
 ### Features
