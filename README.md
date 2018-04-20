@@ -70,7 +70,7 @@ String query = new Query('addresses').size(20).skip(0).orderBy(['id']).select('i
     * flag_not boolean is not true or not false flag_not: true or flag_not: true
   * not, i, and any operators
     * _not: negates expression: can be applied to any expression
-    * _any: matches and value in a collection
+    * _any: matches any value in a collection
     * _i: ignore case, can be applied to any text operator
     * text_not_i_any: demonstrates a combination of all. text not equal to any value in a collection, ignores case
   * AND/OR logical operators, must be uppercase
