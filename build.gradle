@@ -1,0 +1,45 @@
+plugins {
+    id 'groovy'
+    id 'idea'
+}
+
+group 'org.oreto.graphql'
+
+repositories {
+    mavenLocal()
+    jcenter()
+    maven { url "https://oss.sonatype.org/content/repositories/snapshots" }
+    mavenCentral()
+}
+sourceCompatibility = '1.8'
+
+dependencies {
+    compile 'org.codehaus.groovy:groovy-all:2.4.15'
+    // graphl
+    compile "com.graphql-java:graphql-java:+"
+    compile 'com.github.grooviter:gql-core:0.3.0'
+
+    // gorm
+    compile "org.grails:grails-core:3.+"
+    compile "org.grails:grails-datastore-gorm-hibernate5:6.+"
+
+    // logging
+    compile 'org.apache.logging.log4j:log4j-api:2.+'
+    compile 'org.apache.logging.log4j:log4j-core:2.+'
+    compile "org.apache.logging.log4j:log4j-slf4j-impl:2.+"
+
+    // other utils
+    compile "javax.servlet:servlet-api:3.+"
+    compile "org.grails:grails-plugin-converters:+"
+    compile "com.owlike:genson:1.+"
+
+    // testing
+    testCompile (
+        'junit:junit:4.12',
+        'org.spockframework:spock-core:1.1-groovy-2.4',
+        "com.graphql-java:graphql-java:+",
+        'com.github.grooviter:gql-core:0.3.0'
+    )
+    testRuntime "com.h2database:h2:1.+"
+    testRuntime "com.zaxxer:HikariCP:+"
+}
