@@ -68,22 +68,28 @@ def fetchAwsCredentials = {
     }
 }
 
-publishing {
-    publications {
-        mavenJava(MavenPublication) {
-            from components.java
-        }
-    }
+task sourceJar(type: Jar, dependsOn: classes) {
+    classifier 'sources'
+    from sourceSets.main.allSource
 }
-AWSCredentials awsCredentials = fetchAwsCredentials()
 def prefix = version.contains('SNAPSHOT') ? "snapshots" : 'releases'
 publishing {
+    AWSCredentials awsCredentials = fetchAwsCredentials()
     repositories {
         maven {
             url "s3://org.oreto.maven/" + prefix
             credentials(AwsCredentials) {
                 accessKey = awsCredentials.AWSAccessKeyId
                 secretKey = awsCredentials.AWSSecretKey
+            }
+        }
+    }
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+
+            artifact sourceJar {
+                classifier "sources"
             }
         }
     }
