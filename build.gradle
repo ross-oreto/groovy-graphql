@@ -1,9 +1,21 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.amazonaws:aws-java-sdk-core:1.11.314'
+    }
+}
+
 plugins {
     id 'groovy'
     id 'idea'
+    id 'java'
+    id 'maven-publish'
 }
 
-group 'org.oreto.graphql'
+group 'org.oreto'
+version '1.0-SNAPSHOT'
 
 repositories {
     mavenLocal()
@@ -42,4 +54,37 @@ dependencies {
     )
     testRuntime "com.h2database:h2:1.+"
     testRuntime "com.zaxxer:HikariCP:+"
+}
+
+import com.amazonaws.auth.*
+import com.amazonaws.auth.profile.*
+
+def fetchAwsCredentials = {
+    try {
+        return new ProfileCredentialsProvider().credentials
+    } catch (Exception e) {
+        logger.debug('Unable to retrieve AWS credentials from profile, publishing to S3 will not be available.', e)
+        return null
+    }
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+        }
+    }
+}
+AWSCredentials awsCredentials = fetchAwsCredentials()
+def prefix = version.contains('SNAPSHOT') ? "snapshots" : 'releases'
+publishing {
+    repositories {
+        maven {
+            url "s3://org.oreto.maven/" + prefix
+            credentials(AwsCredentials) {
+                accessKey = awsCredentials.AWSAccessKeyId
+                secretKey = awsCredentials.AWSSecretKey
+            }
+        }
+    }
 }

@@ -57,7 +57,7 @@ class Schema {
     private static Collection<Address> createAddresses(Person person, Collection<String> nouns) {
         (1..random.nextInt(3)).collect {
             def address = new Address(
-                    line1: "${random.nextInt(1000)} ${nouns[random.nextInt(999)]}"
+                    line1: "${random.nextInt(200)} ${nouns[random.nextInt(999)]}"
                     , city: 'Nashville'
                     , state: 'TN'
                     , postalCode: '37216'
