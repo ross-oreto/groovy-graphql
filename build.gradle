@@ -29,7 +29,7 @@ dependencies {
     compile 'org.codehaus.groovy:groovy-all:2.4.15'
     // graphl
     compile "com.graphql-java:graphql-java:+"
-    compile 'com.github.grooviter:gql-core:0.3.0'
+    compile 'com.github.grooviter:gql-core:0.3.3'
 
     // gorm
     compile "org.grails:grails-core:3.+"
