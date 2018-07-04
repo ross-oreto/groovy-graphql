@@ -30,6 +30,19 @@ class GqlToCriteria {
                                  , (QueryUtils.LESS_THAN_EQUAL)   : LE
                                  , (QueryUtils.GREATER_THAN_EQUAL): GE] + QueryUtils.substringOpMap
 
+    static filterOpToGroovy = [
+            (QueryUtils.DEFAULT): '=='
+            , (QueryUtils.IN): 'in'
+            , (QueryUtils.LESS_THAN): '<'
+            , (QueryUtils.GREATER_THAN): '>'
+            , (QueryUtils.LESS_THAN_EQUAL): '<='
+            , (QueryUtils.GREATER_THAN_EQUAL): '>='
+            , (QueryUtils.CONTAINS_OP): '==~'
+            , (QueryUtils.STARTS_WITH_OP): '==~'
+            , (QueryUtils.ENDS_WITH_OP): '==~'
+            , (ILIKE): '=~'
+    ]
+
     static criteriaOpToGroovy = [
             (EQ): '=='
             , (LT): '<'
@@ -84,11 +97,13 @@ class GqlToCriteria {
         appendToCriteria('}', sb, objects)
 
         String pagedCriteria = sb.toString()
-        L.info('---------------------------------')
-        L.info(countCriteria)
-        L.info('---------------------------------')
-        L.info(pagedCriteria)
-        L.info('---------------------------------')
+        String message = """---------------------------------
+$countCriteria
+---------------------------------
+$pagedCriteria
+---------------------------------
+"""
+        L.debug(message)
         [countCriteria, pagedCriteria]
     }
 
@@ -160,9 +175,11 @@ class GqlToCriteria {
             appendToCriteria('}', sb, objects)
         }
         def criteriaString = sb.toString()
-//        println('---------------------------------')
-//        print(criteriaString)
-//        println('---------------------------------')
+        String message = """---------------------------------
+$criteriaString
+---------------------------------
+"""
+        L.trace(message)
         criteriaString
     }
 
@@ -244,8 +261,8 @@ class GqlToCriteria {
                                 appendToCriteria("exists ${subClassName}.where { ", sb, objects)
                                 def value = resolveValue(it, o, associatedEntity.javaClass.simpleName)
                                 objects.add('')
-                                def groovyOp = criteriaOpToGroovy.get(o) ?: criteriaOpToGroovy.get(EQ)
-                                def expression = i ? "$f ${criteriaOpToGroovy.get(ILIKE)} $value" : "$f $groovyOp $value"
+                                def groovyOp = filterOpToGroovy.get(o) ?: filterOpToGroovy.get(QueryUtils.DEFAULT)
+                                def expression = i ? "$f ${filterOpToGroovy.get(ILIKE)} $value" : "$f $groovyOp $value"
                                 if (n) expression = "!($expression)"
                                 appendToCriteria("return $expression && $propertyName { ${entity.identity.name} == ${varName}.${associatedEntity.identity.name} }"
                                         , sb
