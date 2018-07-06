@@ -11,6 +11,7 @@ class Person implements GormEntity<Person> {
     }
 
     static hasMany = [addresses: Address]
+    static mappedBy = [addresses: 'person']
 
     static mapping = {
         version false

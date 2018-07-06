@@ -27,6 +27,7 @@ class Schema {
                 , "dataSource.formatSql": false
                 , "dataSource.driverClassName": "org.h2.Driver"
                 , "dataSource.url": "jdbc:h2:mem:test"
+                //, "dataSource.url": "jdbc:h2:file:./data/local;MODE=Oracle;AUTO_SERVER=TRUE"
                 , "dataSource.username": "sa"
                 , "dataSource.password": "sa"
                 , "dataSource.dbCreate": "create-drop"

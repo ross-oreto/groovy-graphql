@@ -31,26 +31,26 @@ class GqlToCriteria {
                                  , (QueryUtils.GREATER_THAN_EQUAL): GE] + QueryUtils.substringOpMap
 
     static filterOpToGroovy = [
-            (QueryUtils.DEFAULT): '=='
-            , (QueryUtils.IN): 'in'
-            , (QueryUtils.LESS_THAN): '<'
-            , (QueryUtils.GREATER_THAN): '>'
-            , (QueryUtils.LESS_THAN_EQUAL): '<='
-            , (QueryUtils.GREATER_THAN_EQUAL): '>='
-            , (QueryUtils.CONTAINS_OP): '==~'
-            , (QueryUtils.STARTS_WITH_OP): '==~'
-            , (QueryUtils.ENDS_WITH_OP): '==~'
-            , (ILIKE): '=~'
+            (QueryUtils.DEFAULT): GroovyOp.EQ
+            , (QueryUtils.IN): GroovyOp.IN_LIST
+            , (QueryUtils.LESS_THAN): GroovyOp.LT
+            , (QueryUtils.GREATER_THAN): GroovyOp.GT
+            , (QueryUtils.LESS_THAN_EQUAL): GroovyOp.LE
+            , (QueryUtils.GREATER_THAN_EQUAL): GroovyOp.GE
+            , (QueryUtils.CONTAINS_OP): GroovyOp.LIKE
+            , (QueryUtils.STARTS_WITH_OP): GroovyOp.LIKE
+            , (QueryUtils.ENDS_WITH_OP): GroovyOp.LIKE
+            , (ILIKE): GroovyOp.ILIKE
     ]
 
     static criteriaOpToGroovy = [
-            (EQ): '=='
-            , (LT): '<'
-            , (GT): '>'
-            , (LE): '<='
-            , (GE): '>='
-            , (LIKE): '==~'
-            , (ILIKE): '=~'
+            (EQ): GroovyOp.EQ
+            , (LT): GroovyOp.LT
+            , (GT): GroovyOp.GT
+            , (LE): GroovyOp.LE
+            , (GE): GroovyOp.GE
+            , (LIKE): GroovyOp.LIKE
+            , (ILIKE): GroovyOp.ILIKE
     ]
 
     static List<String> transform(PersistentEntity entity
@@ -97,13 +97,12 @@ class GqlToCriteria {
         appendToCriteria('}', sb, objects)
 
         String pagedCriteria = sb.toString()
-        String message = """---------------------------------
+        String message = """
+------------------------------------------------------------------
 $countCriteria
----------------------------------
-$pagedCriteria
----------------------------------
-"""
-        L.debug(message)
+------------------------------------------------------------------
+$pagedCriteria------------------------------------------------------------------"""
+        L.info(message)
         [countCriteria, pagedCriteria]
     }
 
@@ -175,9 +174,9 @@ $pagedCriteria
             appendToCriteria('}', sb, objects)
         }
         def criteriaString = sb.toString()
-        String message = """---------------------------------
-$criteriaString
----------------------------------
+        String message = """
+------------------------------------------------------------------
+$criteriaString------------------------------------------------------------------
 """
         L.trace(message)
         criteriaString
@@ -257,14 +256,21 @@ $criteriaString
                                 appendToCriteria('or {', sb, objects)
                                 objects.add('or')
                             }
+
                             (val as Collection).each {
                                 appendToCriteria("exists ${subClassName}.where { ", sb, objects)
                                 def value = resolveValue(it, o, associatedEntity.javaClass.simpleName)
                                 objects.add('')
                                 def groovyOp = filterOpToGroovy.get(o) ?: filterOpToGroovy.get(QueryUtils.DEFAULT)
+                                if (n) groovyOp = GroovyOp.negateOp.get(groovyOp)
                                 def expression = i ? "$f ${filterOpToGroovy.get(ILIKE)} $value" : "$f $groovyOp $value"
-                                if (n) expression = "!($expression)"
-                                appendToCriteria("return $expression && $propertyName { ${entity.identity.name} == ${varName}.${associatedEntity.identity.name} }"
+                                String subVarName1 = "${entity.javaClass.simpleName.toLowerCase()}${objects.size()}"
+                                String subVarName2 = "${associatedEntity.javaClass.simpleName.toLowerCase()}${objects.size()}"
+                                appendToCriteria("def $subVarName2 = $subClassName", sb, objects)
+                                appendToCriteria("def $subVarName1 = $propertyName", sb, objects)
+                                vars.put(subVarName1, subVarName1)
+                                vars.put(subVarName2, subVarName2)
+                                appendToCriteria("return $expression && ${subVarName1}.${entity.identity.name} == ${varName}.${associatedEntity.identity.name}"
                                         , sb
                                         , objects)
                                 objects.pop()
@@ -377,4 +383,23 @@ $criteriaString
         def l = '[', r = ']'
         l + (v as Collection).collect { resolveSingleValue(it, type) }.join(', ') + r
     }
+}
+
+class GroovyOp {
+    static String EQ = '=='
+    static String IN_LIST = 'in'
+    static String LT = '<'
+    static String GT = '>'
+    static String LE = '<='
+    static String GE = '>='
+    static String LIKE = '==~'
+    static String ILIKE = '=~'
+
+    static Map negateOp = [
+            (EQ): '!='
+            , (LT): GE
+            , (GT): LE
+            , (LE): GT
+            , (GE): LT
+    ]
 }

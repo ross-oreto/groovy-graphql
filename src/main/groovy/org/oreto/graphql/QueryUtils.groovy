@@ -100,6 +100,12 @@ class QueryUtils {
             def msg = "$op requires the value to be in the form { field:[x, y] } when $field is a collection"
             if (val instanceof Map) {
                 Map jsonVal = val as Map
+                jsonVal.keySet().each {
+                    (field, op, negate, ignoreCase, any) = parseFieldOp(it)
+                    def groovyOp = GqlToCriteria.filterOpToGroovy.get(op)
+                    if (!groovyOp) throw new FilterException("$op cannot be used here")
+                    if (negate && !GroovyOp.negateOp.get(groovyOp)) throw new FilterException("$op cannot be negated here")
+                }
                 jsonVal.values().each {
                     if (!(it instanceof Collection)) {
                         throw new FilterException(msg)

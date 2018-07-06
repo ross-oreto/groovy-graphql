@@ -15,6 +15,8 @@ class PersonSpec extends GqlSpec {
     static collectionName = 'people'
 
     @Shared Long id
+    @Shared String address1
+    @Shared String address2
 
     def "query people"() {
         setup:
@@ -28,6 +30,8 @@ class PersonSpec extends GqlSpec {
         when:
         LinkedHashMap result = q(query).data
         id = (result[collectionName][RESULTS]['id'] as List)[0] as Long
+        address1 = (result[collectionName][RESULTS][AddressSpec.collectionName][RESULTS]['line1'] as List)[0][0]
+        address2 = (result[collectionName][RESULTS][AddressSpec.collectionName][RESULTS]['line1'] as List)[1][0]
 
         then:
         result[collectionName][RESULTS].size() == GraphUtils.DEFAULT_SIZE &&
@@ -48,5 +52,20 @@ class PersonSpec extends GqlSpec {
         results.size() == 1 &&
                 result[collectionName][PAGE_INFO][GraphUtils.INFO_TOTAL_COUNT_NAME] == 1 &&
                 results['id'][0] as Long == id
+    }
+
+    def "filter person addresses"() {
+        setup:
+        String query = new Query(collectionName).page(Page.Info()).filter("{ addresses_contains:{ line1:['$address1'] }}")
+                .select('id', 'name').build()
+        L.info(query)
+
+        when:
+        LinkedHashMap result = q(query).data
+        List results = result[collectionName][RESULTS] as List
+
+        then:
+        results.size() > 0 &&
+                result[collectionName][PAGE_INFO][GraphUtils.INFO_TOTAL_COUNT_NAME] > 0
     }
 }
