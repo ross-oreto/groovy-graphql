@@ -270,15 +270,12 @@ $criteriaString-----------------------------------------------------------------
                                         subNegate = false
                                     }
                                 }
+                                String subVarName = "${associatedEntity.javaClass.simpleName.toLowerCase()}${objects.size()}"
                                 def expression = i ? "$f ${filterOpToGroovy.get(ILIKE)} $value" : "$f $groovyOp $value"
                                 if (subNegate) expression = "!($expression)"
-                                String subVarName1 = "${entity.javaClass.simpleName.toLowerCase()}${objects.size()}"
-                                String subVarName2 = "${associatedEntity.javaClass.simpleName.toLowerCase()}${objects.size()}"
-                                appendToCriteria("def $subVarName2 = $subClassName", sb, objects)
-                                appendToCriteria("def $subVarName1 = $propertyName", sb, objects)
-                                vars.put(subVarName1, subVarName1)
-                                vars.put(subVarName2, subVarName2)
-                                appendToCriteria("return $expression && ${subVarName1}.${entity.identity.name} == ${varName}.${associatedEntity.identity.name}"
+                                appendToCriteria("def $subVarName = $subClassName", sb, objects)
+                                vars.put(subVarName, subVarName)
+                                appendToCriteria("return $expression && ${propertyName}{${entity.identity.name} == ${varName}.${associatedEntity.identity.name}}"
                                         , sb
                                         , objects)
                                 objects.pop()
