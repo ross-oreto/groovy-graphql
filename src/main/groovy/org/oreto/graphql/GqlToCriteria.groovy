@@ -102,7 +102,7 @@ class GqlToCriteria {
 $countCriteria
 ------------------------------------------------------------------
 $pagedCriteria------------------------------------------------------------------"""
-        L.info(message)
+        L.debug(message)
         [countCriteria, pagedCriteria]
     }
 
@@ -258,12 +258,20 @@ $criteriaString-----------------------------------------------------------------
                             }
 
                             (val as Collection).each {
+                                if (negate) appendToCriteria("not {", sb, objects)
                                 appendToCriteria("exists ${subClassName}.where { ", sb, objects)
                                 def value = resolveValue(it, o, associatedEntity.javaClass.simpleName)
                                 objects.add('')
                                 def groovyOp = filterOpToGroovy.get(o) ?: filterOpToGroovy.get(QueryUtils.DEFAULT)
-                                if (n) groovyOp = GroovyOp.negateOp.get(groovyOp)
+                                boolean subNegate = n
+                                if (subNegate) {
+                                    if (GroovyOp.negateOp.get(groovyOp)) {
+                                        groovyOp = GroovyOp.negateOp.get(groovyOp)
+                                        subNegate = false
+                                    }
+                                }
                                 def expression = i ? "$f ${filterOpToGroovy.get(ILIKE)} $value" : "$f $groovyOp $value"
+                                if (subNegate) expression = "!($expression)"
                                 String subVarName1 = "${entity.javaClass.simpleName.toLowerCase()}${objects.size()}"
                                 String subVarName2 = "${associatedEntity.javaClass.simpleName.toLowerCase()}${objects.size()}"
                                 appendToCriteria("def $subVarName2 = $subClassName", sb, objects)
@@ -275,6 +283,7 @@ $criteriaString-----------------------------------------------------------------
                                         , objects)
                                 objects.pop()
                                 appendToCriteria("}.id()", sb, objects)
+                                if (negate) appendToCriteria("}", sb, objects)
                             }
                             if (a) {
                                 objects.pop()

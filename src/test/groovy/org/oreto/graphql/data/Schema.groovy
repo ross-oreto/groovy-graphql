@@ -23,8 +23,8 @@ class Schema {
         def ds = new HibernateDatastore([
                 "dataSource.pooled": true
                 , "dataSource.jmxExport": true
-                , "dataSource.logSql": false
-                , "dataSource.formatSql": false
+                , "dataSource.logSql": true
+                , "dataSource.formatSql": true
                 , "dataSource.driverClassName": "org.h2.Driver"
                 , "dataSource.url": "jdbc:h2:mem:test"
                 //, "dataSource.url": "jdbc:h2:file:./data/local;MODE=Oracle;AUTO_SERVER=TRUE"

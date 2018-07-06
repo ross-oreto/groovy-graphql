@@ -94,8 +94,8 @@ class QueryUtils {
                 throw new FilterException("$op does not support the any modifier")
             }
         } else if(op == CONTAINS_OP && GraphUtils.propertyIsCollection(property)) {
-            if (any || ignoreCase || negate) {
-                throw new FilterException("$op does not support the (not/i/any) modifiers when $field is a collection")
+            if (any || ignoreCase) {
+                throw new FilterException("$op does not support the (i/any) modifiers when $field is a collection")
             }
             def msg = "$op requires the value to be in the form { field:[x, y] } when $field is a collection"
             if (val instanceof Map) {
@@ -104,7 +104,6 @@ class QueryUtils {
                     (field, op, negate, ignoreCase, any) = parseFieldOp(it)
                     def groovyOp = GqlToCriteria.filterOpToGroovy.get(op)
                     if (!groovyOp) throw new FilterException("$op cannot be used here")
-                    if (negate && !GroovyOp.negateOp.get(groovyOp)) throw new FilterException("$op cannot be negated here")
                 }
                 jsonVal.values().each {
                     if (!(it instanceof Collection)) {

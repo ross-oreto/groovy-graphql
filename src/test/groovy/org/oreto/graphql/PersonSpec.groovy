@@ -56,7 +56,7 @@ class PersonSpec extends GqlSpec {
 
     def "filter person addresses"() {
         setup:
-        String query = new Query(collectionName).page(Page.Info()).filter("{ addresses_contains:{ line1:['$address1'] }}")
+        String query = new Query(collectionName).page(Page.Info()).filter("{ addresses_contains:{ line1_contains:['$address1'], line1_not_contains:['$address1'] } }")
                 .select('id', 'name').build()
         L.info(query)
 
