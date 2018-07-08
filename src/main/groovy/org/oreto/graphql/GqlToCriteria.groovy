@@ -344,9 +344,15 @@ $criteriaString-----------------------------------------------------------------
                                     , StringBuilder sb
                                     , List objects
                                     , boolean valueIsProperty = false) {
-        def value = valueIsProperty ? "property('$v')" : resolveValue(v, operation, property.type.simpleName)
-        String expression = "${ignoreCase ? ILIKE : filterOpToCriteria.get(operation)}('$field', $value)"
-        appendToCriteria(negate ? negateExpression(expression) : expression, sb, objects)
+        if (valueIsProperty) {
+            def groovyOp = filterOpToGroovy.get(ignoreCase ? ILIKE : operation) ?: filterOpToGroovy.get(QueryUtils.DEFAULT)
+            String expression = "$field $groovyOp $v"
+            appendToCriteria(negate ? "!($expression)" : expression, sb, objects)
+        } else {
+            def value = resolveValue(v, operation, property.type.simpleName)
+            String expression = "${ignoreCase ? ILIKE : filterOpToCriteria.get(operation)}('$field', $value)"
+            appendToCriteria(negate ? negateExpression(expression) : expression, sb, objects)
+        }
     }
 
     static String negateExpression(String s) {

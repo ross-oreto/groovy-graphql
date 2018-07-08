@@ -41,7 +41,7 @@ class PersonSpec extends GqlSpec {
 
     def "filter people"() {
         setup:
-        String query = new Query(collectionName).page(Page.Info()).filter("{ id: $id}").select('id', 'name').build()
+        String query = new Query(collectionName).page(Page.Info()).filter("{ id: $id, name: [name]}").select('id', 'name').build()
         L.info(query)
 
         when:
@@ -68,4 +68,19 @@ class PersonSpec extends GqlSpec {
         results.size() > 0 &&
                 result[collectionName][PAGE_INFO][GraphUtils.INFO_TOTAL_COUNT_NAME] > 0
     }
+
+//    def "criteria test"() {
+//        setup:
+//        List<Person> results = []
+//
+//        when:
+//        Person.withNewSession {
+//            results = Person.where {
+//                name == name
+//            }.list()
+//        }
+//
+//        then:
+//        results.size() == Schema.numberOfPeople
+//    }
 }
