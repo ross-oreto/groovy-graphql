@@ -3,6 +3,9 @@ package org.oreto.graphql
 import org.grails.datastore.mapping.model.PersistentEntity
 import org.grails.datastore.mapping.model.PersistentProperty
 
+import java.text.ParsePosition
+import java.text.SimpleDateFormat
+
 class QueryUtils {
 
     static DEFAULT = ''
@@ -14,6 +17,7 @@ class QueryUtils {
     static CONTAINS_OP = 'contains'
     static STARTS_WITH_OP = 'starts_with'
     static ENDS_WITH_OP = 'ends_with'
+    static BETWEEN_OP = 'between'
 
     static filterOps = [DEFAULT
                         , LESS_THAN
@@ -23,7 +27,8 @@ class QueryUtils {
                         , IN
                         , CONTAINS_OP
                         , STARTS_WITH_OP
-                        , ENDS_WITH_OP]
+                        , ENDS_WITH_OP
+                        , BETWEEN_OP]
 
     static substringOpMap = [(CONTAINS_OP): GqlToCriteria.LIKE
                              , (STARTS_WITH_OP): GqlToCriteria.LIKE
@@ -77,23 +82,13 @@ class QueryUtils {
 
     static validateFilterQuery(String field, PersistentProperty property, PersistentEntity persistentEntity
                                , String op, Object val, boolean negate
-                               , boolean ignoreCase, boolean any, boolean checkValueProps = true) {
+                               , boolean ignoreCase, boolean any) {
         if (!property) {
             throw new PropertyNotFoundException(field, persistentEntity.name)
         }
         validateOp(op)
-        if (op == IN) {
-            if (val instanceof Collection) {
-                (val as Collection).each {
-                    validateFieldVal(field, property, persistentEntity, it, op)
-                }
-            } else {
-                throw new FilterException("$op requires $field value to be a list, instead of ${val?.class?.simpleName}")
-            }
-            if (any) {
-                throw new FilterException("$op does not support the any modifier")
-            }
-        } else if(op == CONTAINS_OP && GraphUtils.propertyIsCollection(property)) {
+
+        if(op == CONTAINS_OP && GraphUtils.propertyIsCollection(property)) {
             if (any || ignoreCase) {
                 throw new FilterException("$op does not support the (i/any) modifiers when $field is a collection")
             }
@@ -113,60 +108,80 @@ class QueryUtils {
             } else {
                 throw new FilterException(msg)
             }
-        } else if (ignoreCase) {
-            if (val instanceof Collection) {
-                (val as Collection).each {
-                    validateIgnoreCase(field, property, it)
-                }
-            } else {
-                validateIgnoreCase(field, property, val)
-            }
-        } else if (substringOpMap.containsKey(op)) {
-            if (val instanceof Collection) {
-                (val as Collection).each {
-                    validateSubstringOp(op, field, property, it)
-                }
-            } else {
-                validateSubstringOp(op, field, property, val)
-            }
         } else {
-            if (val instanceof Collection) {
-                Collection valueArray = val as Collection
-                if (checkValueProps && valueArray.size() == 1 && valueArray[0] instanceof String) {
-                    String propertyName = valueArray[0] as String
-                    def valueProperty = persistentEntity.getPropertyByName(propertyName)
-                    if (!valueProperty) {
-                        throw new PropertyNotFoundException(propertyName, persistentEntity.name)
-                    }
-                    validateFieldVal(field, property, persistentEntity, valueProperty, op)
-                } else {
-                    valueArray.each {
-                        validateFieldVal(field, property, persistentEntity, it, op)
+            if (op == IN) {
+                if (!(val instanceof Collection)) {
+                    throw new FilterException("$op requires $field value to be a list, instead of ${val?.class?.simpleName}")
+                }
+                if (any) {
+                    throw new FilterException("$op does not support the any modifier")
+                }
+                (val as Collection).each {
+                    if (isValueProperty(it)) {
+                        throw new FilterException("$op does not support property values")
                     }
                 }
-            } else {
-                validateFieldVal(field, property, persistentEntity, val, op)
+            } else if (op == BETWEEN_OP) {
+                if (any || ignoreCase) {
+                    throw new FilterException("$op does not support the (i/any) modifiers when $field is a collection")
+                }
+                if (!(val instanceof Collection) || (val as Collection).size() != 2) {
+                    throw new FilterException("$op requires a collection of 2 values in the form [x, y]")
+                }
+                (val as Collection).each {
+                    if (!isValueProperty(it)) {
+                        String value = it.toString()
+                        if (!value.isNumber()) {
+                            def date = dateFormatter1.parse(value, new ParsePosition(0))
+                            if (!date) {
+                                date = dateFormatter2.parse(value, new ParsePosition(0))
+                                if (!date)
+                                    throw new FilterException("$op requires a number or date (${GqlToCriteria.format1}, ${GqlToCriteria.format2})")
+                            }
+                        }
+                    }
+                }
             }
+            if (isValueProperty(val)) {
+                validateFieldVal(field, property, persistentEntity, getValueProperty(val, persistentEntity), op, ignoreCase)
+            } else if (val instanceof Collection) {
+                Collection valueArray = val as Collection
+                valueArray.each {
+                    if (isValueProperty(it))
+                        validateFieldVal(field, property, persistentEntity, getValueProperty(it, persistentEntity), op, ignoreCase)
+                    else validateFieldVal(field, property, persistentEntity, it, op, ignoreCase)
+                }
+            } else {
+                validateFieldVal(field, property, persistentEntity, val, op, ignoreCase)
+            }
+
         }
     }
 
-    static validateIgnoreCase(String field, PersistentProperty property, Object val) {
-        if (property.type != String) {
+    static SimpleDateFormat dateFormatter1 = new SimpleDateFormat(GqlToCriteria.format1)
+    static SimpleDateFormat dateFormatter2 = new SimpleDateFormat(GqlToCriteria.format2)
+
+    static PersistentProperty getValueProperty(Object value, PersistentEntity persistentEntity) {
+        Collection valueArray = value as Collection
+        String propertyName = valueArray[0] as String
+        def valueProperty = persistentEntity.getPropertyByName(propertyName)
+        if (!valueProperty) {
+            throw new PropertyNotFoundException(propertyName, persistentEntity.name)
+        }
+        valueProperty
+    }
+
+    static boolean isValueProperty(Object v) {
+        v instanceof Collection && (v as Collection).size() == 1 && v[0] instanceof String
+    }
+
+    static validateFieldVal(String field, PersistentProperty property, PersistentEntity persistentEntity, Object val, String op, boolean ignoreCase) {
+        if (ignoreCase && property.type != String) {
             throw new FilterException("ignore case requires $field type to be a string, instead of ${property.type.simpleName}")
-        } else if (!(val instanceof String)) {
-            throw new FilterException("ignore case requires $field value to be a string, instead of ${val?.class?.simpleName}")
         }
-    }
-
-    static validateSubstringOp(String op, String field, PersistentProperty property, Object val) {
-        if (property.type != String) {
-            throw new FilterException("$op requires $field type to be a string, instead of ${property.type.simpleName}")
-        } else if (!(val instanceof String)) {
+        if (substringOpMap.containsKey(op) && property.type != String) {
             throw new FilterException("$op requires $field value to be a string, instead of ${val?.class?.simpleName}")
         }
-    }
-
-    static validateFieldVal(String field, PersistentProperty property, PersistentEntity persistentEntity, Object val, String op) {
         if (val == null) {
             if(property.type == Boolean || property.type == boolean) {
                 throw new FilterException("$field value must be 'true' or 'false', instead of ${null}")

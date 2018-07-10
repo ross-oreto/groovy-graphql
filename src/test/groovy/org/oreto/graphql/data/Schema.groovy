@@ -13,7 +13,7 @@ class Schema {
 
     private static GraphQLSchema schema
 
-    static int numberOfPeople
+    static int numberOfPeople = 21986
 
     static getSchema() {
         schema ? schema : buildSchema()

@@ -68,6 +68,15 @@ String query = new Query('addresses').size(20).skip(0).orderBy(['id']).select('i
     * number_gt: number greater than a value
     * number_gte: number greater than or equal to a value
     * number_in: in a collection of values [19, 31, 66]
+    * number_between: between two numbers [1, 10]
+  * Date operators (uses formats [mm-dd-yyyy] or [mm-dd-yyyy hh:mm:ss])
+    * date: exact date match
+    * date_lt: date less than a date
+    * date_lte: date less than or equal to a date
+    * date_gt: number greater than a date
+    * date_gte: number greater than or equal to a date
+    * date_in: in a collection of dates ['9-22-2015', '3-1-2017', '7-9-2018']
+    * date_between: between two dates ['9-22-2015', '3-1-2017']
   * Boolean operators
     * flag: boolean is true or false flag: true or flag: false
     * flag_not boolean is not true or not false flag_not: true or flag_not: true
@@ -86,3 +95,6 @@ String query = new Query('addresses').size(20).skip(0).orderBy(['id']).select('i
   * Ordering: order results according to one or multiple fields. ex: orderBy: ["lastName_asc", "firstName_asc"]
     * field_asc: ascending order
     * field_desc: descending order
+  * Properties are referenced using a single value collection with the property name. 
+    * ex: id:[otherId] which equates to id == otherId, both database fields.  
+  

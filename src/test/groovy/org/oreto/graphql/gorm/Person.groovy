@@ -18,5 +18,7 @@ class Person implements GormEntity<Person> {
         batchSize 100
     }
 
+    Date dateCreated
+    Date lastUpdated
     String name
 }

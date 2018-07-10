@@ -41,7 +41,7 @@ class PersonSpec extends GqlSpec {
 
     def "filter people"() {
         setup:
-        String query = new Query(collectionName).page(Page.Info()).filter("{ id: $id, name: [name]}").select('id', 'name').build()
+        String query = new Query(collectionName).page(Page.Info()).filter("{ id: $id, id_between: [[id], 5000]}").select('id', 'name').build()
         L.info(query)
 
         when:
@@ -56,7 +56,7 @@ class PersonSpec extends GqlSpec {
 
     def "filter person addresses"() {
         setup:
-        String query = new Query(collectionName).page(Page.Info()).filter("{ addresses_contains:{ line1_contains:['$address1'], line1_not_contains:['$address1'] } }")
+        String query = new Query(collectionName).page(Page.Info()).filter("{ addresses_contains:{ dateCreated_between: [ ['7-8-2000', [dateCreated]] ] } }")
                 .select('id', 'name').build()
         L.info(query)
 

@@ -21,6 +21,7 @@ class GqlToCriteria {
     static String GE = 'ge'
     static String LIKE = 'like'
     static String ILIKE = 'ilike'
+    static String BETWEEN = 'between'
 
     static filterOpToCriteria = [(QueryUtils.DEFAULT)             : EQ
                                  , (QueryUtils.IN)                : IN_LIST
@@ -28,7 +29,8 @@ class GqlToCriteria {
                                  , (QueryUtils.LESS_THAN)         : LT
                                  , (QueryUtils.GREATER_THAN)      : GT
                                  , (QueryUtils.LESS_THAN_EQUAL)   : LE
-                                 , (QueryUtils.GREATER_THAN_EQUAL): GE] + QueryUtils.substringOpMap
+                                 , (QueryUtils.GREATER_THAN_EQUAL): GE
+                                 , (QueryUtils.BETWEEN_OP): BETWEEN] + QueryUtils.substringOpMap
 
     static filterOpToGroovy = [
             (QueryUtils.DEFAULT): GroovyOp.EQ
@@ -41,6 +43,7 @@ class GqlToCriteria {
             , (QueryUtils.STARTS_WITH_OP): GroovyOp.LIKE
             , (QueryUtils.ENDS_WITH_OP): GroovyOp.LIKE
             , (ILIKE): GroovyOp.ILIKE
+            , (QueryUtils.BETWEEN_OP): BETWEEN
     ]
 
     static criteriaOpToGroovy = [
@@ -247,7 +250,6 @@ $criteriaString-----------------------------------------------------------------
                         jsonValue.each { key, val ->
                             def (String f, String o, boolean n, boolean i, boolean a) = QueryUtils.parseFieldOp(key)
                             def p = associatedEntity.getPropertyByName(f)
-                            QueryUtils.validateFilterQuery(f, p, associatedEntity, o, val, n, i, a, false)
 
                             String subClassName = associatedEntity.javaClass.name
                             String propertyName = GraphUtils.getPropertyNameForAssociation(association, entity.javaClass)
@@ -258,20 +260,30 @@ $criteriaString-----------------------------------------------------------------
                             }
 
                             (val as Collection).each {
+                                QueryUtils.validateFilterQuery(f, p, associatedEntity, o, it, n, i, a)
                                 if (negate) appendToCriteria("not {", sb, objects)
                                 appendToCriteria("exists ${subClassName}.where { ", sb, objects)
-                                def value = resolveValue(it, o, associatedEntity.javaClass.simpleName)
-                                objects.add('')
+                                String expression
                                 def groovyOp = filterOpToGroovy.get(o) ?: filterOpToGroovy.get(QueryUtils.DEFAULT)
                                 boolean subNegate = n
-                                if (subNegate) {
-                                    if (GroovyOp.negateOp.get(groovyOp)) {
-                                        groovyOp = GroovyOp.negateOp.get(groovyOp)
-                                        subNegate = false
-                                    }
-                                }
+                                objects.add('')
                                 String subVarName = "${associatedEntity.javaClass.simpleName.toLowerCase()}${objects.size()}"
-                                def expression = i ? "$f ${filterOpToGroovy.get(ILIKE)} $value" : "$f $groovyOp $value"
+                                String type = p.type.simpleName
+                                if (groovyOp == BETWEEN) {
+                                    Collection range = it as Collection
+                                    String val1 = resolveSingleValue(range[0], type)
+                                    String val2 = resolveSingleValue(range[1], type)
+                                    expression = "$f ${GroovyOp.GE} ${val1} && $f ${GroovyOp.LE} ${val2}"
+                                } else {
+                                    def value = resolveValue(it, o, type)
+                                    if (subNegate) {
+                                        if (GroovyOp.negateOp.get(groovyOp)) {
+                                            groovyOp = GroovyOp.negateOp.get(groovyOp)
+                                            subNegate = false
+                                        }
+                                    }
+                                    expression = i ? "$f ${filterOpToGroovy.get(ILIKE)} $value" : "$f $groovyOp $value"
+                                }
                                 if (subNegate) expression = "!($expression)"
                                 appendToCriteria("def $subVarName = $subClassName", sb, objects)
                                 vars.put(subVarName, subVarName)
@@ -301,14 +313,16 @@ $criteriaString-----------------------------------------------------------------
                         String nullOp = GraphUtils.propertyIsCollection(property) ? 'isEmpty' : 'isNull'
                         String expression = "$nullOp('$field')"
                         appendToCriteria(negate ? negateExpression(expression) : expression, sb, objects)
-                    } else if (v instanceof  Collection && operation != QueryUtils.IN) {
+                    } else if (v instanceof Collection && (operation != QueryUtils.IN && operation != QueryUtils.BETWEEN_OP)) {
                         Collection arrayValue = v as Collection
-                        if (arrayValue.size() == 1 && arrayValue[0] instanceof String) {
-                            appendCriteriaExpression(arrayValue[0], operation, property, field, negate, ignoreCase, sb, objects, true)
+                        if (QueryUtils.isValueProperty(arrayValue)) {
+                            appendCriteriaExpression(arrayValue, operation, property, field, negate, ignoreCase, sb, objects)
                         } else {
                             def combinator = any ? 'or' : 'and'
                             appendCriteriaExpressions(arrayValue, operation, property, field, negate, ignoreCase, sb, objects, combinator)
                         }
+                    } else if (operation == QueryUtils.IN && v instanceof Collection && (v as Collection).size() == 1){
+                        appendCriteriaExpression(v[0], QueryUtils.DEFAULT, property, field, negate, ignoreCase, sb, objects)
                     } else {
                         appendCriteriaExpression(v, operation, property, field, negate, ignoreCase, sb, objects)
                     }
@@ -342,11 +356,22 @@ $criteriaString-----------------------------------------------------------------
                                     , boolean negate
                                     , boolean ignoreCase
                                     , StringBuilder sb
-                                    , List objects
-                                    , boolean valueIsProperty = false) {
+                                    , List objects) {
+        boolean valueIsProperty = QueryUtils.isValueProperty(v)
+        if (!valueIsProperty && v instanceof Collection) {
+            valueIsProperty = (v as Collection).find { QueryUtils.isValueProperty(it) } != null
+        }
         if (valueIsProperty) {
             def groovyOp = filterOpToGroovy.get(ignoreCase ? ILIKE : operation) ?: filterOpToGroovy.get(QueryUtils.DEFAULT)
-            String expression = "$field $groovyOp $v"
+            String expression
+            if (groovyOp == BETWEEN) {
+                Collection range = v as Collection
+                String val1 = resolveSingleValue(range[0], property.type.simpleName)
+                String val2 = resolveSingleValue(range[1], property.type.simpleName)
+                expression = "$field ${GroovyOp.GE} ${val1} && $field ${GroovyOp.LE} ${val2}"
+            } else {
+                expression = "$field $groovyOp ${resolveValue(v, operation, property.type.simpleName)}"
+            }
             appendToCriteria(negate ? "!($expression)" : expression, sb, objects)
         } else {
             def value = resolveValue(v, operation, property.type.simpleName)
@@ -370,12 +395,24 @@ $criteriaString-----------------------------------------------------------------
             case QueryUtils.STARTS_WITH_OP: v = "$v%".toString(); break
             case QueryUtils.ENDS_WITH_OP: v = "%$v".toString(); break
         }
-        v instanceof Collection ? resolveArrayValue(v, type) : resolveSingleValue(v, type)
+        if (op == BETWEEN) {
+            Collection value = v as Collection
+            "${resolveSingleValue(value[0], type)}, ${resolveSingleValue(value[1], type)}"
+        } else {
+            (v instanceof Collection && !QueryUtils.isValueProperty(v)) ? resolveArrayValue(v, type) : resolveSingleValue(v, type)
+        }
     }
+
+    static String format1 = 'MM-dd-yyyy HH:mm:ss'
+    static String format2 = 'MM-dd-yyyy'
 
     static String resolveSingleValue(Object v, String type) {
         String s = v.toString()
-        v instanceof String ? "'$s'" : (s.isNumber() ? toNumberWrapper(v, type) : s)
+        if (QueryUtils.isValueProperty(v)) v[0]
+        else if (type == 'Date') {
+            if (s.contains(' ')) "new java.text.SimpleDateFormat('$format1').parse('$s')"
+            else "new java.text.SimpleDateFormat('$format2').parse('$s')"
+        } else v instanceof String ? "'$s'" : (s.isNumber() ? toNumberWrapper(v, type) : s)
     }
 
     static String toNumberWrapper(Object v, String type) {

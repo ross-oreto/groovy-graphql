@@ -21,6 +21,9 @@ class Address implements GormEntity<Address> {
         batchSize 100
     }
 
+    Date dateCreated
+    Date lastUpdated
+
     String line1
     String line2
     String city
