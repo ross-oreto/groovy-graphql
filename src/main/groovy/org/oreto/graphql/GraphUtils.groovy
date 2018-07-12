@@ -6,7 +6,7 @@ import gql.DSL
 import gql.dsl.ScalarsAware
 import grails.converters.JSON
 import graphql.language.Field
-import graphql.language.StringValue
+import graphql.language.NullValue
 import graphql.schema.DataFetchingEnvironment
 import graphql.schema.GraphQLOutputType
 import graphql.schema.GraphQLSchema
@@ -98,10 +98,14 @@ class GraphUtils {
         selections.each {
             def results = (it.selectionSet?.selections as List<Field>)?.find { it.name == PAGED_RESULTS_NAME }
             if (results) {
-                String filter = (it.arguments.find { it.name == FILTER_ARG_NAME }?.value as StringValue)?.value ?: '{}'
-                int max = (it.arguments.find { it.name == SIZE_ARG_NAME }?.value)?.value ?: DEFAULT_SIZE
+                def filterArg = it.arguments.find { it.name == FILTER_ARG_NAME }?.value
+                def sizeArg = it.arguments.find { it.name == SIZE_ARG_NAME }?.value
+                def skipArg = it.arguments.find { it.name == SKIP_ARG_NAME }?.value
+
+                String filter = filterArg instanceof NullValue ? '{}' : filterArg?.value ?: '{}'
+                int max = sizeArg instanceof NullValue ? DEFAULT_SIZE : sizeArg?.value ?: DEFAULT_SIZE
                 if (max > MAX_SIZE) max = MAX_SIZE
-                int offset = (it.arguments.find { it.name == SKIP_ARG_NAME }?.value)?.value ?: 0
+                int offset = skipArg instanceof NullValue ? 0 : skipArg?.value ?: 0
 
                 List<Field> resultSelections = results.selectionSet?.selections as List<Field>
                 Association association = getAssociation(entity, it.name)
@@ -114,7 +118,8 @@ class GraphUtils {
                 if (batchSize < DEFAULT_BATCH_SIZE) batchSize = DEFAULT_BATCH_SIZE
                 int batches = (count / batchSize) + ((count % batchSize) == 0 ? 0 : 1)
                 Collection eagerResults = []
-                def orderBy = (it.arguments.find { it.name == ORDERBY_ARG_NAME }?.value)?.values?.collect { it.value }
+                def orderByArg = it.arguments.find { it.name == ORDERBY_ARG_NAME }?.value
+                def orderBy = orderByArg instanceof NullValue ? [] : orderByArg?.values?.collect { it.value }
                 for (int i = 0; i < batches; i++) {
                     String criteria = GqlToCriteria.transformEagerBatch(entity
                             , ids
