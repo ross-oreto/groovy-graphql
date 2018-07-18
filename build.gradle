@@ -23,7 +23,7 @@ repositories {
     maven { url "https://oss.sonatype.org/content/repositories/releases/" }
     mavenCentral()
 }
-sourceCompatibility = '1.8'
+sourceCompatibility = '1.9'
 
 dependencies {
     compile 'org.codehaus.groovy:groovy-all:2.4.15'

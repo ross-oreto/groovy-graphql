@@ -91,7 +91,7 @@ class GraphUtils {
         filterQuery
     }
 
-    static int DEFAULT_BATCH_SIZE = 2000
+    static int DEFAULT_BATCH_SIZE = 200
 
     static eagerFetch(Collection entities, PersistentEntity entity, List<Field> selections) {
         def ids = entities.collect { it."${entity.identity.name}" }
@@ -114,7 +114,7 @@ class GraphUtils {
                         , association
                         , resultSelections
                         , [(FILTER_ARG_NAME) : filter], true))
-                int batchSize = (count / 20) + 1
+                int batchSize = (count / 10) + 1
                 if (batchSize < DEFAULT_BATCH_SIZE) batchSize = DEFAULT_BATCH_SIZE
                 int batches = (count / batchSize) + ((count % batchSize) == 0 ? 0 : 1)
                 Collection eagerResults = []
