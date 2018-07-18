@@ -181,7 +181,7 @@ $pagedCriteria------------------------------------------------------------------
 ------------------------------------------------------------------
 $criteriaString------------------------------------------------------------------
 """
-        L.trace(message)
+        L.debug(message)
         criteriaString
     }
 
@@ -385,7 +385,7 @@ $criteriaString-----------------------------------------------------------------
     }
 
     static void appendToCriteria(String s, StringBuilder sb, List objs){
-        String tabs = objs.collect{ '\t' }.join('')
+        String tabs = objs.collect{ ' ' }.join('')
         sb.append("$tabs$s\n" as String)
     }
 
