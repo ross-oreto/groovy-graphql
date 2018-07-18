@@ -15,6 +15,8 @@ class Address implements GormEntity<Address> {
         postalCode nullable: true
     }
 
+    static hasMany = [tests: Test]
+
     static mapping = {
         version false
         person lazy: false

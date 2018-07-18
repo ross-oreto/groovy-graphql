@@ -2,4 +2,4 @@
 .gradle
 gradle
 build
-data
+/data

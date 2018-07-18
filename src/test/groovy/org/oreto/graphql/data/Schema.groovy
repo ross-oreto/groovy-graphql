@@ -8,6 +8,7 @@ import org.oreto.graphql.GraphUtils
 import org.oreto.graphql.gorm.Address
 import org.oreto.graphql.gorm.Person
 import org.oreto.graphql.gorm.PersonService
+import org.oreto.graphql.gorm.Test
 
 class Schema {
 
@@ -31,6 +32,7 @@ class Schema {
                 , "dataSource.username": "sa"
                 , "dataSource.password": "sa"
                 , "dataSource.dbCreate": "create-drop"
+                //, "dataSource.dbCreate": "none"
         ], Person)
         populateTestData(ds)
         schema = GraphUtils.createGqlSchema(['people':Person.gormPersistentEntity, 'addresses': Address.gormPersistentEntity])
@@ -63,6 +65,9 @@ class Schema {
                     , state: 'TN'
                     , postalCode: '37216'
             )
+            (1..5).each {
+                address.addToTests(new Test(name: "test$it"))
+            }
             person.addToAddresses(address)
             address
         }

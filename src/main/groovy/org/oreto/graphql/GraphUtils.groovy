@@ -15,9 +15,14 @@ import org.grails.core.artefact.DomainClassArtefactHandler
 import org.grails.datastore.mapping.model.PersistentEntity
 import org.grails.datastore.mapping.model.PersistentProperty
 import org.grails.datastore.mapping.model.types.Association
+import org.grails.orm.hibernate.cfg.GrailsDomainBinder
 import org.grails.orm.hibernate.cfg.PropertyConfig
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
 class GraphUtils {
+
+    private static final Logger L = LoggerFactory.getLogger(GraphUtils.class)
 
     static String SIZE_ARG_NAME = 'size'
     static String SKIP_ARG_NAME = 'skip'
@@ -109,29 +114,29 @@ class GraphUtils {
 
                 List<Field> resultSelections = results.selectionSet?.selections as List<Field>
                 Association association = getAssociation(entity, it.name)
-                def count = Eval.me(GqlToCriteria.transformEagerBatch(entity
-                        , ids
-                        , association
-                        , resultSelections
-                        , [(FILTER_ARG_NAME) : filter], true))
-                int batchSize = (count / 10) + 1
-                if (batchSize < DEFAULT_BATCH_SIZE) batchSize = DEFAULT_BATCH_SIZE
-                int batches = (count / batchSize) + ((count % batchSize) == 0 ? 0 : 1)
+
+                int batchSize = GrailsDomainBinder.getMapping(association.associatedEntity.javaClass).batchSize ?: DEFAULT_BATCH_SIZE
+                L.debug("${association.associatedEntity.javaClass.simpleName} batch size: $batchSize")
+
                 Collection eagerResults = []
                 def orderByArg = it.arguments.find { it.name == ORDERBY_ARG_NAME }?.value
-                def orderBy = orderByArg instanceof NullValue ? [] : orderByArg?.values?.collect { it.value }
-                for (int i = 0; i < batches; i++) {
+                List<String> orderBy = orderByArg instanceof NullValue ? [] : orderByArg?.values?.collect { it.value as String }
+
+                int i = 1
+                ids.collate(batchSize).each {
+                    L.debug("batch: $i")
                     String criteria = GqlToCriteria.transformEagerBatch(entity
-                            , ids
+                            , it
                             , association
                             , resultSelections
                             , [(FILTER_ARG_NAME) : filter
                                , (SIZE_ARG_NAME) : batchSize
-                               , (SKIP_ARG_NAME) : (i * batchSize)
+                               , (SKIP_ARG_NAME) : 0
                                , (ORDERBY_ARG_NAME) : orderBy
                     ])
                     if (eagerResults) eagerResults.addAll(Eval.me(criteria) as Collection)
                     else eagerResults = Eval.me(criteria) as Collection
+                    i++
                 }
                 if (eagerResults.size()) {
                     def entityMap = resultSetToEntityMap(eagerResults
@@ -141,7 +146,18 @@ class GraphUtils {
                     entities.each {
                         def id = it."${entity.identity.name}"
                         if (entityMap.containsKey(id)) {
-                            it."$propertyName" = entityMap.get(id).drop(offset).take(max)
+                            it."$propertyName" = entityMap.get(id).sort{ a, b ->
+                                int compare = 0
+                                for(Map.Entry<String, String> order : QueryUtils.parseOrderBy(orderBy, association.associatedEntity)) {
+                                    if (order.value == 'asc') {
+                                        compare = a."${order.key}" <=> b."${order.key}"
+                                    } else {
+                                        compare = b."${order.key}" <=> a."${order.key}"
+                                    }
+                                    if (compare != 0) break
+                                }
+                                compare
+                            }.drop(offset).take(max)
                         } else it."$propertyName" = []
                     }
                     if (entityMap.size() > 0) {
