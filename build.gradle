@@ -15,7 +15,7 @@ plugins {
 }
 
 group 'org.oreto'
-version '1.8-SNAPSHOT'
+version '1.9-SNAPSHOT'
 
 repositories {
     mavenLocal()
@@ -23,7 +23,7 @@ repositories {
     maven { url "https://oss.sonatype.org/content/repositories/releases/" }
     mavenCentral()
 }
-sourceCompatibility = '1.9'
+sourceCompatibility = '1.8'
 
 dependencies {
     compile 'org.codehaus.groovy:groovy-all:2.4.15'
