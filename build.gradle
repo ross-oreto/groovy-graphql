@@ -15,7 +15,7 @@ plugins {
 }
 
 group 'org.oreto'
-version '1.11-SNAPSHOT'
+version '1.12-SNAPSHOT'
 
 repositories {
     mavenLocal()

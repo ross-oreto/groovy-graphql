@@ -11,6 +11,7 @@ class Test implements GormEntity<Test> {
     }
 
     static hasMany = [addresses: Address]
+    static belongsTo = Address
 
     static mapping = {
         version false

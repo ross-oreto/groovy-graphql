@@ -20,6 +20,7 @@ class Address implements GormEntity<Address> {
     static mapping = {
         version false
         person lazy: false
+        tests cascade: "all"
         batchSize 100
     }
 

@@ -20,7 +20,7 @@ class PersonSpec extends GqlSpec {
 
     def "query people"() {
         setup:
-        String query = new Query(collectionName).page(Page.Info()).select('id', 'name')
+        String query = new Query(collectionName).size(50).page(Page.Info()).select('id', 'name')
                 .select(
                     new Query(AddressSpec.collectionName).size(20).skip(0).orderBy(['id']).select('id', 'line1')
                             .select(new Result(entityName).select('id'))
@@ -35,9 +35,10 @@ class PersonSpec extends GqlSpec {
         address2 = (result[collectionName][RESULTS][AddressSpec.collectionName][RESULTS]['line1'] as List)[1][0]
 
         then:
-        result[collectionName][RESULTS].size() == GraphUtils.DEFAULT_SIZE &&
+        result[collectionName][RESULTS].size() == Schema.numberOfPeople &&
                 result[collectionName][PAGE_INFO][GraphUtils.INFO_TOTAL_COUNT_NAME] == Schema.numberOfPeople &&
-                result[collectionName][RESULTS][AddressSpec.collectionName][RESULTS][entityName]['id'].size() == GraphUtils.DEFAULT_SIZE
+                result[collectionName][RESULTS][AddressSpec.collectionName][RESULTS][entityName]['id'].size() == Schema.numberOfPeople &&
+                result[collectionName][RESULTS][AddressSpec.collectionName][RESULTS]['tests'][RESULTS]['name'][0][0].size() == 3
     }
 
     def "filter people"() {

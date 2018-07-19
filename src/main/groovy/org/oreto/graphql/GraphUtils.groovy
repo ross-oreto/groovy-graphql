@@ -124,19 +124,23 @@ class GraphUtils {
                         orderByArg instanceof Collection ? orderByArg?.values?.collect { it.value as String } : [orderByArg.value]
 
                 int i = 1
-                ids.collate(batchSize).each {
+                ids.collate(batchSize).each { idBatch ->
                     L.debug("batch: $i")
                     String criteria = GqlToCriteria.transformEagerBatch(entity
-                            , it
+                            , idBatch
                             , association
                             , resultSelections
                             , [(FILTER_ARG_NAME) : filter
-                               , (SIZE_ARG_NAME) : batchSize
+                               , (SIZE_ARG_NAME) : 1000000
                                , (SKIP_ARG_NAME) : 0
                                , (ORDERBY_ARG_NAME) : orderBy
                     ])
-                    if (eagerResults) eagerResults.addAll(Eval.me(criteria) as Collection)
-                    else eagerResults = Eval.me(criteria) as Collection
+                    if (eagerResults) {
+                        eagerResults.addAll(Eval.me(criteria) as Collection)
+                    }
+                    else {
+                        eagerResults = Eval.me(criteria) as Collection
+                    }
                     i++
                 }
                 if (eagerResults.size()) {
@@ -159,7 +163,9 @@ class GraphUtils {
                                 }
                                 compare
                             }.drop(offset).take(max)
-                        } else it."$propertyName" = []
+                        } else {
+                            it."$propertyName" = []
+                        }
                     }
                     if (entityMap.size() > 0) {
                         def newEntities = []

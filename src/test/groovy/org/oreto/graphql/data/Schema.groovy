@@ -14,7 +14,7 @@ class Schema {
 
     private static GraphQLSchema schema
 
-    static int numberOfPeople = 21986
+    static int numberOfPeople = 50
 
     static getSchema() {
         schema ? schema : buildSchema()
@@ -35,7 +35,7 @@ class Schema {
                 //, "dataSource.dbCreate": "none"
         ], Person)
         populateTestData(ds)
-        schema = GraphUtils.createGqlSchema(['people':Person.gormPersistentEntity, 'addresses': Address.gormPersistentEntity])
+        schema = GraphUtils.createGqlSchema(['people':Person.gormPersistentEntity, 'addresses': Address.gormPersistentEntity, 'tests': Test.gormPersistentEntity])
     }
 
     private static Random random = new Random()
@@ -45,10 +45,10 @@ class Schema {
         Genson genson = new GensonBuilder().useStrictDoubleParse(false).create()
         def namesData = new FileInputStream('src/test/resources/names.json')
         def nounsData = new FileInputStream('src/test/resources/nouns.json')
-        Collection names = genson.deserialize(namesData, String[].class)
+        List names = genson.deserialize(namesData, String[].class)
         Collection nouns = genson.deserialize(nounsData, String[].class)
 
-        def people = names.collect {
+        def people = names.subList(0, numberOfPeople).collect {
             def p = new Person(name: it)
             createAddresses(p, nouns)
             p
@@ -65,7 +65,7 @@ class Schema {
                     , state: 'TN'
                     , postalCode: '37216'
             )
-            (1..5).each {
+            (1..3).each {
                 address.addToTests(new Test(name: "test$it"))
             }
             person.addToAddresses(address)
