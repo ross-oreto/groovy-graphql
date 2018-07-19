@@ -24,7 +24,7 @@ class PersonSpec extends GqlSpec {
                 .select(
                     new Query(AddressSpec.collectionName).size(20).skip(0).orderBy(['id']).select('id', 'line1')
                             .select(new Result(entityName).select('id'))
-                            .select(new Query('tests').select('name'))
+                            .select(new Query('tests').select('name', 'picture'))
         ).build()
         L.info(query)
 

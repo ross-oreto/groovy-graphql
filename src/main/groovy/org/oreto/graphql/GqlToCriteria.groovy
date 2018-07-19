@@ -78,7 +78,14 @@ class GqlToCriteria {
         appendToCriteria("projections {", sb, objects)
         objects.add('projections')
 
-        appendToCriteria("distinct('${entity.identity.name}')", sb, objects)
+        String distinctOrProperty = 'distinct'
+        selections.each {
+            String type = entity.getPropertyByName(it.name).type.simpleName
+            if (type == 'byte[]' || type == 'Blob' || type == 'Clob') {
+                distinctOrProperty = 'property'
+            }
+        }
+        appendToCriteria("$distinctOrProperty('${entity.identity.name}')", sb, objects)
         addProjectionSelections(entity
                 , GraphUtils.fieldsWithoutId(selections, entity)
                 , ''
