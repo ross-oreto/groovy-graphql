@@ -120,7 +120,8 @@ class GraphUtils {
 
                 Collection eagerResults = []
                 def orderByArg = it.arguments.find { it.name == ORDERBY_ARG_NAME }?.value
-                List<String> orderBy = orderByArg instanceof NullValue ? [] : orderByArg?.values?.collect { it.value as String }
+                List<String> orderBy = orderByArg == null || orderByArg instanceof NullValue ? [] :
+                        orderByArg instanceof Collection ? orderByArg?.values?.collect { it.value as String } : [orderByArg.value]
 
                 int i = 1
                 ids.collate(batchSize).each {

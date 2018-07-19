@@ -42,7 +42,7 @@ class PersonSpec extends GqlSpec {
 
     def "filter people"() {
         setup:
-        String query = new Query(collectionName).page(Page.Info()).filter("{ id: $id, id_between: [[id], 5000]}").select('id', 'name').build()
+        String query = new Query(collectionName).page(Page.Info()).filter("{ id: $id, id_between: [[id], 50000]}").select('id', 'name').build()
         L.info(query)
 
         when:

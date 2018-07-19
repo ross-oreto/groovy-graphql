@@ -93,7 +93,9 @@ class QueryBuilder {
                 if (params.size != null) args.add("${GraphUtils.SIZE_ARG_NAME}:${params.size}")
                 if (params.skip != null) args.add("${GraphUtils.SKIP_ARG_NAME}:${params.skip}")
                 if (params.orderBy) {
-                    args.add("${GraphUtils.ORDERBY_ARG_NAME}:[${params.orderBy.collect{ "\"$it\"" }.join(', ')}]")
+                    if (params.orderBy.size() > 1)
+                        args.add("${GraphUtils.ORDERBY_ARG_NAME}:[${params.orderBy.collect{ "\"$it\"" }.join(', ')}]")
+                    else args.add("${GraphUtils.ORDERBY_ARG_NAME}:\"${params.orderBy[0]}\"")
                 }
                 sb.append(args.join(', ')).append(')').append(" {$ln")
             } else {

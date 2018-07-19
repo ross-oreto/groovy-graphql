@@ -72,7 +72,8 @@ class GqlToCriteria {
         }
         //addAliasSelections(selections, '', sb, aliasMap, objects)
         String countCriteria = "${sb.toString()}\t\tprojections { countDistinct('${entity.identity.name}') }\n\t}.list()\n}"
-        List<String> orderBy = queryArgs.get(GraphUtils.ORDERBY_ARG_NAME) as List<String> ?: []
+        def orderByArg = queryArgs.get(GraphUtils.ORDERBY_ARG_NAME)
+        List<String> orderBy = orderByArg instanceof Collection ? orderByArg as List<String> : [orderByArg as String]
 
         appendToCriteria("projections {", sb, objects)
         objects.add('projections')
@@ -165,7 +166,8 @@ $pagedCriteria------------------------------------------------------------------
             objects.pop()
             appendToCriteria('}', sb, objects)
         } else {
-            List<String> orderBy = queryArgs.get(GraphUtils.ORDERBY_ARG_NAME) as List<String> ?: []
+            def orderByArg = queryArgs.get(GraphUtils.ORDERBY_ARG_NAME)
+            List<String> orderBy = orderByArg instanceof Collection ? orderByArg as List<String> : [orderByArg as String]
             QueryUtils.parseOrderBy(orderBy, entity).each {
                 appendToCriteria("order('${it.key}', '${it.value}')", sb, objects)
             }
