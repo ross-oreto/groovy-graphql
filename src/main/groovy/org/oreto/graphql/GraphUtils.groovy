@@ -397,20 +397,47 @@ class GraphUtils {
     }
 
     static GraphQLOutputType propertyToType(PersistentProperty property) {
-        switch (property.type.simpleName) {
-            case 'String': ScalarsAware.GraphQLString; break
-            case 'Integer': ScalarsAware.GraphQLInt; break
-            case 'Long': ScalarsAware.GraphQLLong; break
-            case 'Short': ScalarsAware.GraphQLShort; break
-            case 'Byte': ScalarsAware.GraphQLByte; break
-            case 'Float': ScalarsAware.GraphQLFloat; break
-            case 'BigInteger': ScalarsAware.GraphQLBigInteger; break
-            case 'BigDecimal': ScalarsAware.GraphQLBigDecimal; break
-            case 'Boolean': ScalarsAware.GraphQLBoolean; break
-            case 'Char': ScalarsAware.GraphQLChar; break
-            case ('byte[]' || 'Byte[]') && property.name.toLowerCase().endsWith('image'): GraphQLByteString; break
-            default: ScalarsAware.GraphQLString; break
+        GraphQLOutputType gtype
+        String propertyType = property.type.simpleName
+        switch (propertyType) {
+            case 'String':
+                gtype = ScalarsAware.GraphQLString
+                break
+            case 'Integer':
+                gtype = ScalarsAware.GraphQLInt
+                break
+            case 'Long':
+                gtype = ScalarsAware.GraphQLLong
+                break
+            case 'Short':
+                gtype = ScalarsAware.GraphQLShort
+                break
+            case 'Byte':
+                gtype = ScalarsAware.GraphQLByte
+                break
+            case 'Float':
+                gtype = ScalarsAware.GraphQLFloat
+                break
+            case 'BigInteger':
+                gtype = ScalarsAware.GraphQLBigInteger
+                break
+            case 'BigDecimal':
+                gtype = ScalarsAware.GraphQLBigDecimal
+                break
+            case 'Boolean':
+                gtype = ScalarsAware.GraphQLBoolean
+                break
+            case 'Char':
+                gtype = ScalarsAware.GraphQLChar
+                break
+            case { it == 'byte[]' || it == 'Byte[]' && property.name.toLowerCase().endsWith('image')}:
+                gtype = GraphQLByteString
+                break
+            default:
+                gtype = ScalarsAware.GraphQLString
+                break
         }
+        gtype
     }
 
     static GraphQLScalarType GraphQLByteString = DSL.scalar('Base64ByteString') {

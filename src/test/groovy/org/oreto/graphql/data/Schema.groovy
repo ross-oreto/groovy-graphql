@@ -66,10 +66,12 @@ class Schema {
                     , postalCode: '37216'
             )
             (1..3).each {
-                address.addToTests(new Test(name: "test$it"))
+                address.addToTests(new Test(name: "test$it", image: bytes))
             }
             person.addToAddresses(address)
             address
         }
     }
+
+    static byte[] bytes = [1, 2, 3, 4, 5, 6]
 }
