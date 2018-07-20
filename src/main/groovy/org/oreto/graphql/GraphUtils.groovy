@@ -409,7 +409,7 @@ class GraphUtils {
             case 'BigDecimal': ScalarsAware.GraphQLBigDecimal; break
             case 'Boolean': ScalarsAware.GraphQLBoolean; break
             case 'Char': ScalarsAware.GraphQLChar; break
-            case 'Byte[]' && property.name.toLowerCase().endsWith('image'): GraphQLByteString; break
+            case ('byte[]' || 'Byte[]') && property.name.toLowerCase().endsWith('image'): GraphQLByteString; break
             default: ScalarsAware.GraphQLString; break
         }
     }
