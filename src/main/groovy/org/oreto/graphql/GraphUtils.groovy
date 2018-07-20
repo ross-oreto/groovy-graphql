@@ -7,10 +7,8 @@ import gql.dsl.ScalarsAware
 import grails.converters.JSON
 import graphql.language.Field
 import graphql.language.NullValue
-import graphql.schema.DataFetchingEnvironment
-import graphql.schema.GraphQLOutputType
-import graphql.schema.GraphQLSchema
-import graphql.schema.GraphQLTypeReference
+import graphql.language.StringValue
+import graphql.schema.*
 import org.grails.core.artefact.DomainClassArtefactHandler
 import org.grails.datastore.mapping.model.PersistentEntity
 import org.grails.datastore.mapping.model.PersistentProperty
@@ -411,7 +409,40 @@ class GraphUtils {
             case 'BigDecimal': ScalarsAware.GraphQLBigDecimal; break
             case 'Boolean': ScalarsAware.GraphQLBoolean; break
             case 'Char': ScalarsAware.GraphQLChar; break
+            case 'Byte[]' && property.name.toLowerCase().endsWith('image'): GraphQLByteString; break
             default: ScalarsAware.GraphQLString; break
+        }
+    }
+
+    public static final GraphQLScalarType GraphQLByteString = new GraphQLScalarType("Base64String"
+            , "Base64 string encoded image"
+            , new Coercing<String, String>() {
+        @Override
+        String serialize(Object input) {
+            Base64.encoder.encodeToString(input as byte[])
+        }
+
+        @Override
+        String parseValue(Object input) {
+            serialize(input)
+        }
+
+        @Override
+        String parseLiteral(Object input) {
+            if (!(input instanceof StringValue)) {
+                throw new CoercingParseLiteralException(
+                        "Expected AST type 'StringValue' but was '" + typeName(input) + "'."
+                )
+            }
+            return ((StringValue) input).getValue()
+        }
+    })
+
+    static String typeName(Object input) {
+        if (input == null) {
+            'null'
+        } else {
+            input.getClass().getSimpleName()
         }
     }
 
