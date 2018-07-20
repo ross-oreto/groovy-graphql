@@ -17,7 +17,7 @@ class TestSpec extends GqlSpec {
 
     def "query tests"() {
         setup:
-        String query = new Query(collectionName).page(Page.Info()).select('id', 'name', 'picture').build()
+        String query = new Query(collectionName).page(Page.Info()).select('id', 'name', 'image').build()
         L.info(query)
 
         when:

@@ -8,7 +8,7 @@ class Test implements GormEntity<Test> {
 
     static constraints = {
         name nullable: true
-        picture nullable: true
+        image nullable: true
     }
 
     static hasMany = [addresses: Address]
@@ -22,5 +22,5 @@ class Test implements GormEntity<Test> {
     Date dateCreated
     Date lastUpdated
     String name
-    byte[] picture
+    byte[] image
 }

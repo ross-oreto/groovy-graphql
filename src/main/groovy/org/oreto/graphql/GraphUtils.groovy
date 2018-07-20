@@ -7,7 +7,6 @@ import gql.dsl.ScalarsAware
 import grails.converters.JSON
 import graphql.language.Field
 import graphql.language.NullValue
-import graphql.language.StringValue
 import graphql.schema.*
 import org.grails.core.artefact.DomainClassArtefactHandler
 import org.grails.datastore.mapping.model.PersistentEntity
@@ -398,7 +397,7 @@ class GraphUtils {
     }
 
     static GraphQLOutputType propertyToType(PersistentProperty property) {
-        switch (property.class.simpleName) {
+        switch (property.type.simpleName) {
             case 'String': ScalarsAware.GraphQLString; break
             case 'Integer': ScalarsAware.GraphQLInt; break
             case 'Long': ScalarsAware.GraphQLLong; break
@@ -414,35 +413,15 @@ class GraphUtils {
         }
     }
 
-    public static final GraphQLScalarType GraphQLByteString = new GraphQLScalarType("Base64String"
-            , "Base64 string encoded image"
-            , new Coercing<String, String>() {
-        @Override
-        String serialize(Object input) {
-            Base64.encoder.encodeToString(input as byte[])
+    static GraphQLScalarType GraphQLByteString = DSL.scalar('Base64ByteString') {
+        serialize { byte[] bytes ->
+            Base64.encoder.encodeToString(bytes)
         }
-
-        @Override
-        String parseValue(Object input) {
-            serialize(input)
+        parseLiteral { value ->
+            Base64.decoder.decode(value.value as String)
         }
-
-        @Override
-        String parseLiteral(Object input) {
-            if (!(input instanceof StringValue)) {
-                throw new CoercingParseLiteralException(
-                        "Expected AST type 'StringValue' but was '" + typeName(input) + "'."
-                )
-            }
-            return ((StringValue) input).getValue()
-        }
-    })
-
-    static String typeName(Object input) {
-        if (input == null) {
-            'null'
-        } else {
-            input.getClass().getSimpleName()
+        parseValue { String value ->
+            Base64.decoder.decode(value)
         }
     }
 
