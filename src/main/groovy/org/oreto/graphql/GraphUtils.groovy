@@ -24,6 +24,8 @@ class GraphUtils {
     static String SIZE_ARG_NAME = 'size'
     static String SKIP_ARG_NAME = 'skip'
     static String FILTER_ARG_NAME = 'filter'
+    static String PARAMS_ARG_NAME = 'params'
+    static String ID_ARG_NAME = 'id'
     static String ORDERBY_ARG_NAME = 'orderBy'
     static String PAGED_RESULTS_NAME = 'results'
     static String PAGE_INFO_NAME = 'pageInfo'
@@ -50,11 +52,64 @@ class GraphUtils {
             entry = iterator.next()
             entityQueries = entityQueries << entityToFilterQuery(entry.key, entry.value, typeMap)
         }
+
+        iterator = entities.entrySet().iterator()
+        entry = iterator.next()
+        def mutationQueries = entityToMutationQuery(entry.value, typeMap)
+        mutationQueries = mutationQueries << entityToDeleteQuery(entry.value, typeMap)
+        while(iterator.hasNext()) {
+            entry = iterator.next()
+            mutationQueries = mutationQueries << entityToMutationQuery(entry.value, typeMap)
+            mutationQueries = mutationQueries << entityToDeleteQuery(entry.value, typeMap)
+        }
+
         DSL.schema( {
             queries(
                     entityQueries
             )
+            mutations(
+                    mutationQueries
+            )
         })
+    }
+
+    static Closure entityToMutationQuery(PersistentEntity entity, Map<String, GraphQLOutputType> typeMap) {
+        String fieldName = "save${entity.javaClass.simpleName}"
+        Closure mutation = {
+            field(fieldName) {
+                type entityToType(entity, typeMap, false)
+                argument(PARAMS_ARG_NAME, GraphQLString)
+                fetcher { DataFetchingEnvironment env ->
+                    def params = JSON.parse((env.getArgument(PARAMS_ARG_NAME) ?: '{}') as String) as Map<String, Object>
+                    def newEntity = entity.javaClass.newInstance()
+                    grails.web.databinding.DataBindingUtils.bindObjectToInstance(newEntity, params, [], [], '')
+                    entity.javaClass.withTransaction  {
+                        newEntity = newEntity.save(failOnError:true)
+                    }
+                    newEntity
+                }
+            }
+        }
+        mutation
+    }
+
+    static Closure entityToDeleteQuery(PersistentEntity entity, Map<String, GraphQLOutputType> typeMap) {
+        String fieldName = "delete${entity.javaClass.simpleName}"
+        Closure mutation = {
+            field(fieldName) {
+                type entityToType(entity, typeMap, false)
+                argument(ID_ARG_NAME, propertyToType(entity.identity))
+                fetcher { DataFetchingEnvironment env ->
+                    def id = env.getArgument(ID_ARG_NAME)
+                    entity.javaClass.withTransaction  {
+                        def deletedEntity = entity.javaClass.get(id)
+                        deletedEntity.delete()
+                        deletedEntity
+                    }
+                }
+            }
+        }
+        mutation
     }
 
     static Closure entityToFilterQuery(String name, PersistentEntity entity, Map<String, GraphQLOutputType> typeMap) {

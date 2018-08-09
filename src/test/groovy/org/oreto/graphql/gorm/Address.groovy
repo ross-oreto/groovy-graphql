@@ -13,6 +13,7 @@ class Address implements GormEntity<Address> {
         state nullable: true
         country nullable: true
         postalCode nullable: true
+        person nullable: true
     }
 
     static hasMany = [tests: Test]

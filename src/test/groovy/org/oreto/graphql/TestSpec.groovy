@@ -26,4 +26,47 @@ class TestSpec extends GqlSpec {
         then:
         result[collectionName][RESULTS].size() == GraphUtils.DEFAULT_SIZE
     }
+
+    def "save tests"() {
+        setup:
+        String query =
+                """mutation {
+    saveTest(params:"{ name:'new test' }") {
+        id
+        name
+    }
+}"""
+        L.info(query)
+
+        when:
+        LinkedHashMap result = q(query).data
+        id = result.saveTest.id
+        query =
+                """mutation {
+    saveTest(params:"{ id:$id, name:'updated test' }") {
+        id
+        name
+    }
+}"""
+        result = q(query).data
+
+        then:
+        result.saveTest.name == 'updated test'
+    }
+
+    def "delete test"() {
+        setup:
+        String query =
+                """mutation {
+    deleteTest(id:$id) {
+        id
+        name
+    }
+}"""
+        when:
+        LinkedHashMap result = q(query).data
+
+        then:
+        result.deleteTest.id == id
+    }
 }

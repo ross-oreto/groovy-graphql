@@ -71,6 +71,46 @@ class PersonSpec extends GqlSpec {
                 result[collectionName][PAGE_INFO][GraphUtils.INFO_TOTAL_COUNT_NAME] > 0
     }
 
+    def "save people"() {
+        setup:
+        String query =
+                """mutation {
+    savePerson(params:"{ name:'test person 1', 'addresses[0]':{ line1:'test address 1'} }") {
+        id
+        name
+        addresses {
+            results {
+                id
+                line1
+            }
+        }
+    }
+}"""
+        L.info(query)
+
+        when:
+        LinkedHashMap result = q(query).data
+        id = result.savePerson.id
+        query =
+                """mutation {
+    savePerson(params:"{ id:$id, name:'updated person 1', 'addresses[1]':{ line1:'test address 2'} }") {
+        id
+        name
+        addresses {
+            results {
+                id
+                line1
+            }
+        }
+    }
+}"""
+        result = q(query).data
+
+        then:
+        result.savePerson.id != null
+        result.savePerson.name == 'updated person 1'
+    }
+
 //    def "criteria test"() {
 //        setup:
 //        List<Person> results = []
