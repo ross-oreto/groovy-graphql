@@ -82,7 +82,7 @@ class GraphUtils {
                 fetcher { DataFetchingEnvironment env ->
                     def params = JSON.parse((env.getArgument(PARAMS_ARG_NAME) ?: '{}') as String) as Map<String, Object>
                     def newEntity = entity.javaClass.newInstance()
-                    grails.web.databinding.DataBindingUtils.bindObjectToInstance(newEntity, params, [], [], '')
+                    grails.web.databinding.DataBindingUtils.bindObjectToInstance(newEntity, params, [entity.identity.name], [], '')
                     entity.javaClass.withTransaction  {
                         newEntity = newEntity.save(failOnError:true)
                     }
