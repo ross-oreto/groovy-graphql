@@ -92,6 +92,13 @@ class GraphUtils {
                     }
                     grails.web.databinding.DataBindingUtils.bindObjectToInstance(newEntity, params, null, null, '')
                     entity.javaClass.withTransaction  {
+                        if (!newEntity.dirty) {
+                            params.keySet().each {
+                                String field = it
+                                if (field.contains('[')) field = field.substring(0, field.indexOf('['))
+                                newEntity.markDirty(field)
+                            }
+                        }
                         newEntity = newEntity.save(failOnError:true)
                     }
                     newEntity
