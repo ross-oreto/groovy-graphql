@@ -403,8 +403,9 @@ class GraphUtils {
             if (association) {
                 PersistentEntity associatedEntity = association.getAssociatedEntity()
                 if (propertyIsCollection(property)) {
+                    def graphType = associatedEntity ? entityToType(associatedEntity, typeMap) : typeToGraphType(associatedEntity.javaClass, associatedEntity.name)
                     graphField = { field(property.name) {
-                        type entityToType(associatedEntity, typeMap)
+                        type graphType
                         argument(FILTER_ARG_NAME, GraphQLString)
                         argument(SIZE_ARG_NAME, GraphQLInt)
                         argument(SKIP_ARG_NAME, GraphQLInt)
@@ -466,10 +467,10 @@ class GraphUtils {
         graphType
     }
 
-    static GraphQLOutputType propertyToType(PersistentProperty property) {
+    static GraphQLOutputType typeToGraphType(Class type, String propertyName) {
         GraphQLOutputType gtype
-        String propertyType = property.type.simpleName
-        switch (propertyType) {
+        String typeName = type.simpleName
+        switch (typeName) {
             case 'String':
                 gtype = ScalarsAware.GraphQLString
                 break
@@ -500,7 +501,7 @@ class GraphUtils {
             case 'Char':
                 gtype = ScalarsAware.GraphQLChar
                 break
-            case { it == 'byte[]' || it == 'Byte[]' && property.name.toLowerCase().endsWith('image')}:
+            case { it == 'byte[]' || it == 'Byte[]' && propertyName.toLowerCase().endsWith('image')}:
                 gtype = GraphQLByteString
                 break
             default:
@@ -508,6 +509,10 @@ class GraphUtils {
                 break
         }
         gtype
+    }
+
+    static GraphQLOutputType propertyToType(PersistentProperty property) {
+        typeToGraphType(property.type, property.name)
     }
 
     static GraphQLScalarType GraphQLByteString = DSL.scalar('Base64ByteString') {
