@@ -101,7 +101,9 @@ class GraphUtils {
                         }
                         newEntity = newEntity.save(failOnError:true)
                     }
-                    newEntity
+                    entity.javaClass.withTransaction {
+                        newEntity.refresh()
+                    }
                 }
             }
         }
@@ -403,7 +405,7 @@ class GraphUtils {
             if (association) {
                 PersistentEntity associatedEntity = association.getAssociatedEntity()
                 if (propertyIsCollection(property)) {
-                    def graphType = associatedEntity ? entityToType(associatedEntity, typeMap) : typeToGraphType(associatedEntity.javaClass, associatedEntity.name)
+                    def graphType = associatedEntity ? entityToType(associatedEntity, typeMap) : typeToGraphType(association.type, association.name)
                     graphField = { field(property.name) {
                         type graphType
                         argument(FILTER_ARG_NAME, GraphQLString)
