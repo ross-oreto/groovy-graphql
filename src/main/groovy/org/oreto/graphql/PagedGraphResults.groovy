@@ -25,3 +25,7 @@ class PageInfo {
         this.page = (int) (((skip + 1) / size) + (((skip + 1) % size) > 0 ? 1 : 0))
     }
 }
+
+class BasicListType {
+    String value
+}

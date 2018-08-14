@@ -34,6 +34,8 @@ class GraphUtils {
     static String INFO_SKIP_NAME = 'skip'
     static String INFO_PAGE_NAME = 'page'
     static String INFO_TOTAL_PAGES_NAME = 'totalPages'
+    static String KEY_NAME = 'key'
+    static String VALUE_NAME = 'value'
 
     static int DEFAULT_SIZE = 20
     static int MAX_SIZE = 1000
@@ -184,8 +186,8 @@ class GraphUtils {
                 List<Field> resultSelections = results.selectionSet?.selections as List<Field>
                 Association association = getAssociation(entity, it.name)
 
-                int batchSize = GrailsDomainBinder.getMapping(association.associatedEntity.javaClass).batchSize ?: DEFAULT_BATCH_SIZE
-                L.debug("${association.associatedEntity.javaClass.simpleName} batch size: $batchSize")
+                int batchSize = GrailsDomainBinder.getMapping(association.associatedEntity?.javaClass)?.batchSize ?: DEFAULT_BATCH_SIZE
+                L.debug("${association.associatedEntity?.javaClass?.simpleName ?: association.name} batch size: $batchSize")
 
                 Collection eagerResults = []
                 def orderByArg = it.arguments.find { it.name == ORDERBY_ARG_NAME }?.value
@@ -212,7 +214,7 @@ class GraphUtils {
                     }
                     i++
                 }
-                if (eagerResults.size()) {
+                if (eagerResults?.size()) {
                     def entityMap = resultSetToEntityMap(eagerResults
                             , association.associatedEntity
                             , fieldsWithoutId(resultSelections, association.associatedEntity))
@@ -239,7 +241,9 @@ class GraphUtils {
                     if (entityMap.size() > 0) {
                         def newEntities = []
                         entityMap.each { newEntities.addAll(it.value) }
-                        if (newEntities.size()) eagerFetch(newEntities, association.associatedEntity, resultSelections)
+                        if (newEntities.size()) {
+                            eagerFetch(newEntities, association.associatedEntity, resultSelections)
+                        }
                     }
                 } else {
                     def propertyName = it.name
@@ -292,7 +296,43 @@ class GraphUtils {
                 type list(DSL.type(listName, mergeClosures(fields)))
             }
             field(PAGE_INFO_NAME) {
-                type PageInfo
+                type GraphUtils.PageInfo
+            }
+        }
+    }
+
+    static GraphQLOutputType pagedBasicListType(String name, String listName) {
+        DSL.type(name) {
+            field(PAGED_RESULTS_NAME) {
+                type list(DSL.type(listName) {
+                    field(VALUE_NAME) {
+                        description('item value')
+                        type GraphQLString
+                    }
+                })
+            }
+            field(PAGE_INFO_NAME) {
+                type GraphUtils.PageInfo
+            }
+        }
+    }
+
+    static GraphQLOutputType pagedBasicMapType(String name, String listName) {
+        DSL.type(name) {
+            field(PAGED_RESULTS_NAME) {
+                type list(DSL.type(listName, {
+                    field(KEY_NAME) {
+                        description('item key')
+                        type GraphQLString
+                    }
+                    field(VALUE_NAME) {
+                        description('item value')
+                        type GraphQLString
+                    }
+                }))
+            }
+            field(PAGE_INFO_NAME) {
+                type GraphUtils.PageInfo
             }
         }
     }
@@ -405,49 +445,89 @@ class GraphUtils {
             if (association) {
                 PersistentEntity associatedEntity = association.getAssociatedEntity()
                 if (propertyIsCollection(property)) {
-                    def graphType = associatedEntity ? entityToType(associatedEntity, typeMap) : typeToGraphType(association.type, association.name)
-                    graphField = { field(property.name) {
-                        type graphType
-                        argument(FILTER_ARG_NAME, GraphQLString)
-                        argument(SIZE_ARG_NAME, GraphQLInt)
-                        argument(SKIP_ARG_NAME, GraphQLInt)
-                        argument(ORDERBY_ARG_NAME, list(GraphQLString))
-                        fetcher { DataFetchingEnvironment env ->
-                            int max = env.getArgument(SIZE_ARG_NAME) ?: DEFAULT_SIZE
-                            max = max > MAX_SIZE ? MAX_SIZE : max
-                            int offset = (env.getArgument(SKIP_ARG_NAME) ?: 0) as int
-                            String filter = env.getArgument(FILTER_ARG_NAME) as String
-
-                            if (env.getSource()?."$property.name" == null) {
-                                String propertyName = getPropertyNameForAssociation(association, env.getSource().class)
-                                def id = env.getSource()."${entity.identity.name}"
-                                def filterWithId = JSON.parse(filter ?: '{}') as Map<String, Object>
-                                filterWithId.put(propertyName, [(entity.identity.name): id])
-                                filter = genson.serialize(filterWithId)
-
-                                List<Field> selections = (env.selectionSet.get().get(PAGED_RESULTS_NAME)
-                                        ?.find { it.name == PAGED_RESULTS_NAME }
-                                        ?.selectionSet?.selections as List<Field>)
-                                        .findAll { it.name != associatedEntity.identity.name} ?: []
-
-                                List<String> criteriaList =
-                                        GqlToCriteria.transform(associatedEntity, selections, [
-                                                (FILTER_ARG_NAME)   : filter
-                                                , (SIZE_ARG_NAME)   : max
-                                                , (SKIP_ARG_NAME)   : offset
-                                                , (ORDERBY_ARG_NAME): env.getArgument(ORDERBY_ARG_NAME)
-                                        ])
-                                def count = Eval.me(criteriaList[0]) as Collection
-                                def results = Eval.me(criteriaList[1]) as Collection
-                                def entities = resultSetToEntities(results, associatedEntity, selections)
-                                new PagedGraphResults(entities
-                                        , max, offset, count[0] as int)
+                    if (!associatedEntity) {
+                        println("collection of basic type ${association.type}:${association.name}")
+                        String listName = "${association.name}List"
+                        String resultsListName = "${listName}Results"
+                        def typeRef
+                        if (typeMap.containsKey(resultsListName)) {
+                            typeRef = typeMap.get(resultsListName)
+                        } else {
+                            typeRef = new GraphQLTypeReference(resultsListName)
+                            typeMap.put(resultsListName, typeRef)
+                            if (Map.isAssignableFrom(property?.type)) {
+                                typeRef = pagedBasicMapType(resultsListName, listName)
                             } else {
-                                LinkedHashSet entities = env.getSource()."$property.name"
-                                new PagedGraphResults(entities, max, offset, entities.size())
+                                typeRef = pagedBasicListType(resultsListName, listName)
                             }
                         }
-                    } }
+                        graphField = { field(property.name) {
+                            type typeRef
+                            argument(FILTER_ARG_NAME, GraphQLString)
+                            argument(SIZE_ARG_NAME, GraphQLInt)
+                            argument(SKIP_ARG_NAME, GraphQLInt)
+                            argument(ORDERBY_ARG_NAME, list(GraphQLString))
+                            fetcher { DataFetchingEnvironment env ->
+                                int max = env.getArgument(SIZE_ARG_NAME) ?: DEFAULT_SIZE
+                                max = max > MAX_SIZE ? MAX_SIZE : max
+                                int offset = (env.getArgument(SKIP_ARG_NAME) ?: 0) as int
+                                //String filter = env.getArgument(FILTER_ARG_NAME) as String
+
+                                def mock = [new BasicListType(value: 'Misty')
+                                            , new BasicListType(value: 'Leo')
+                                            , new BasicListType(value: 'Jake')]
+                                new PagedGraphResults(mock, max, offset, mock.size())
+                            }
+                        }
+                        }
+                        fields.add( graphField )
+                    } else {
+                        graphField = { field(property.name) {
+                            type entityToType(associatedEntity, typeMap)
+                            argument(FILTER_ARG_NAME, GraphQLString)
+                            argument(SIZE_ARG_NAME, GraphQLInt)
+                            argument(SKIP_ARG_NAME, GraphQLInt)
+                            argument(ORDERBY_ARG_NAME, list(GraphQLString))
+                            fetcher { DataFetchingEnvironment env ->
+                                int max = env.getArgument(SIZE_ARG_NAME) ?: DEFAULT_SIZE
+                                max = max > MAX_SIZE ? MAX_SIZE : max
+                                int offset = (env.getArgument(SKIP_ARG_NAME) ?: 0) as int
+                                String filter = env.getArgument(FILTER_ARG_NAME) as String
+
+                                if (env.getSource()?."$property.name" == null) {
+                                    String propertyName = getPropertyNameForAssociation(association, env.getSource().class)
+                                    def id = env.getSource()."${entity.identity.name}"
+                                    def filterWithId = JSON.parse(filter ?: '{}') as Map<String, Object>
+                                    filterWithId.put(propertyName, [(entity.identity.name): id])
+                                    filter = genson.serialize(filterWithId)
+
+                                    List<Field> selections = (env.selectionSet.get().get(PAGED_RESULTS_NAME)
+                                            ?.find { it.name == PAGED_RESULTS_NAME }
+                                            ?.selectionSet?.selections as List<Field>)
+                                            .findAll { it.name != associatedEntity.identity.name} ?: []
+
+                                    List<String> criteriaList =
+                                            GqlToCriteria.transform(associatedEntity, selections, [
+                                                    (FILTER_ARG_NAME)   : filter
+                                                    , (SIZE_ARG_NAME)   : max
+                                                    , (SKIP_ARG_NAME)   : offset
+                                                    , (ORDERBY_ARG_NAME): env.getArgument(ORDERBY_ARG_NAME)
+                                            ])
+                                    def count = Eval.me(criteriaList[0]) as Collection
+                                    def results = Eval.me(criteriaList[1]) as Collection
+                                    def entities = resultSetToEntities(results, associatedEntity, selections)
+                                    new PagedGraphResults(entities
+                                            , max, offset, count[0] as int)
+                                } else {
+                                    LinkedHashSet entities = []
+                                    env.getSource().class.withTransaction {
+                                        entities = env.getSource()."$property.name"
+                                    }
+                                    new PagedGraphResults(entities, max, offset, entities.size())
+                                }
+                            }
+                        } }
+                    }
                 } else {
                     graphField = { field(property.name) {
                         type entityToType(associatedEntity, typeMap, false)

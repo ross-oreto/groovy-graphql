@@ -125,65 +125,68 @@ $pagedCriteria------------------------------------------------------------------
                                       , boolean count = false) {
 
         PersistentEntity entity = association.associatedEntity
-        StringBuilder sb = new StringBuilder("${entity.javaClass.name}.withTransaction {\n")
-        List objects = ['withTransaction']
-        appendToCriteria("${entity.javaClass.name}.where {", sb, objects)
-        objects.add(entity.javaClass.name)
+        StringBuilder sb = new StringBuilder()
+        if (entity) {
+            sb.append("${entity.javaClass.name}.withTransaction {\n")
+            List objects = ['withTransaction']
+            appendToCriteria("${entity.javaClass.name}.where {", sb, objects)
+            objects.add(entity.javaClass.name)
 
-        String filter = queryArgs.get('filter') as String
-        try {
-            _transform(entity, '', JSON.parse(filter ?: '{}') as Map<String, Object>, sb, objects)
-        } catch (Exception exception) {
-            throw new FilterException(exception.message + ":" + exception?.cause?.message)
-        }
-        String propertyName = GraphUtils.getPropertyNameForAssociation(association, parentEntity.javaClass)
-        appendToCriteria("$propertyName {", sb, objects)
-        objects.add(propertyName)
-        appendToCriteria("or {", sb, objects)
-        objects.add('or')
-        ids.each {
-            def value = resolveValue(it, '', parentEntity.identity.type.simpleName)
-            appendToCriteria("${filterOpToCriteria.get(QueryUtils.DEFAULT)}('${parentEntity.identity.name}', $value)"
-                    , sb, objects)
-        }
-        objects.pop()
-        appendToCriteria("}", sb, objects)
-
-        objects.pop()
-        appendToCriteria('}', sb, objects)
-
-        if (!count) {
-            appendToCriteria("createAlias('$propertyName', '$propertyName')", sb, objects)
-            appendToCriteria("projections {", sb, objects)
-            objects.add('projections')
-            appendToCriteria("property('${propertyName}.${parentEntity.identity.name}')", sb, objects)
-            appendToCriteria("property('${entity.identity.name}')", sb, objects)
-            addProjectionSelections(entity
-                    , GraphUtils.fieldsWithoutId(selections, entity)
-                    , ''
-                    , sb
-                    , objects)
-            objects.pop()
-            appendToCriteria('}', sb, objects)
-        }
-
-        if (count) {
-            objects.pop()
-            appendToCriteria('}.count()', sb, objects)
-            objects.pop()
-            appendToCriteria('}', sb, objects)
-        } else {
-            def orderByArg = queryArgs.get(GraphUtils.ORDERBY_ARG_NAME)
-            List<String> orderBy = orderByArg instanceof Collection ? orderByArg as List<String> : [orderByArg as String]
-            QueryUtils.parseOrderBy(orderBy, entity).each {
-                appendToCriteria("order('${it.key}', '${it.value}')", sb, objects)
+            String filter = queryArgs.get('filter') as String
+            try {
+                _transform(entity, '', JSON.parse(filter ?: '{}') as Map<String, Object>, sb, objects)
+            } catch (Exception exception) {
+                throw new FilterException(exception.message + ":" + exception?.cause?.message)
+            }
+            String propertyName = GraphUtils.getPropertyNameForAssociation(association, parentEntity.javaClass)
+            appendToCriteria("$propertyName {", sb, objects)
+            objects.add(propertyName)
+            appendToCriteria("or {", sb, objects)
+            objects.add('or')
+            ids.each {
+                def value = resolveValue(it, '', parentEntity.identity.type.simpleName)
+                appendToCriteria("${filterOpToCriteria.get(QueryUtils.DEFAULT)}('${parentEntity.identity.name}', $value)"
+                        , sb, objects)
             }
             objects.pop()
-            int max = queryArgs.containsKey(GraphUtils.SIZE_ARG_NAME) ? queryArgs.get(GraphUtils.SIZE_ARG_NAME) as int : 100
-            int offset = queryArgs.containsKey(GraphUtils.SIZE_ARG_NAME) ?  queryArgs.get(GraphUtils.SKIP_ARG_NAME) as int : 0
-            appendToCriteria("}.list([max:$max, offset:$offset])", sb, objects)
+            appendToCriteria("}", sb, objects)
+
             objects.pop()
             appendToCriteria('}', sb, objects)
+
+            if (!count) {
+                appendToCriteria("createAlias('$propertyName', '$propertyName')", sb, objects)
+                appendToCriteria("projections {", sb, objects)
+                objects.add('projections')
+                appendToCriteria("property('${propertyName}.${parentEntity.identity.name}')", sb, objects)
+                appendToCriteria("property('${entity.identity.name}')", sb, objects)
+                addProjectionSelections(entity
+                        , GraphUtils.fieldsWithoutId(selections, entity)
+                        , ''
+                        , sb
+                        , objects)
+                objects.pop()
+                appendToCriteria('}', sb, objects)
+            }
+
+            if (count) {
+                objects.pop()
+                appendToCriteria('}.count()', sb, objects)
+                objects.pop()
+                appendToCriteria('}', sb, objects)
+            } else {
+                def orderByArg = queryArgs.get(GraphUtils.ORDERBY_ARG_NAME)
+                List<String> orderBy = orderByArg instanceof Collection ? orderByArg as List<String> : [orderByArg as String]
+                QueryUtils.parseOrderBy(orderBy, entity).each {
+                    appendToCriteria("order('${it.key}', '${it.value}')", sb, objects)
+                }
+                objects.pop()
+                int max = queryArgs.containsKey(GraphUtils.SIZE_ARG_NAME) ? queryArgs.get(GraphUtils.SIZE_ARG_NAME) as int : 100
+                int offset = queryArgs.containsKey(GraphUtils.SIZE_ARG_NAME) ? queryArgs.get(GraphUtils.SKIP_ARG_NAME) as int : 0
+                appendToCriteria("}.list([max:$max, offset:$offset])", sb, objects)
+                objects.pop()
+                appendToCriteria('}', sb, objects)
+            }
         }
         def criteriaString = sb.toString()
         String message = """

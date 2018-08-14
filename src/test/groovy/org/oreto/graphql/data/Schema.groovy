@@ -35,7 +35,9 @@ class Schema {
                 //, "dataSource.dbCreate": "none"
         ], Person)
         populateTestData(ds)
-        schema = GraphUtils.createGqlSchema(['people':Person.gormPersistentEntity, 'addresses': Address.gormPersistentEntity, 'tests': Test.gormPersistentEntity])
+        schema = GraphUtils.createGqlSchema(['people':Person.gormPersistentEntity
+                                             , 'addresses': Address.gormPersistentEntity
+                                             , 'tests': Test.gormPersistentEntity])
     }
 
     private static Random random = new Random()
@@ -49,7 +51,7 @@ class Schema {
         Collection nouns = genson.deserialize(nounsData, String[].class)
 
         def people = names.subList(0, numberOfPeople).collect {
-            def p = new Person(name: it)
+            def p = new Person(name: it, cats: ['Misty', 'Leo', 'Jake'])
             createAddresses(p, nouns)
             p
         }

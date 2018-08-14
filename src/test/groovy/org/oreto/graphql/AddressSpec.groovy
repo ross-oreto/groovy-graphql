@@ -35,7 +35,8 @@ class AddressSpec extends GqlSpec {
 
     def "filter addresses"() {
         setup:
-        String query = new Query(collectionName).page(Page.Info()).filter("{ id: $id}").select('id', 'line1').build()
+        String query = new Query(collectionName).page(Page.Info()).filter("{ id: $id}")
+                .select('id', 'line1').select(new Result(PersonSpec.getEntityName()).select('id')).build()
         L.info(query)
 
         when:
@@ -45,6 +46,7 @@ class AddressSpec extends GqlSpec {
         then:
         results.size() == 1 &&
                 result[collectionName][PAGE_INFO][GraphUtils.INFO_TOTAL_COUNT_NAME] == 1 &&
+                result[collectionName][RESULTS][PersonSpec.getEntityName()]['id'][0] > 0 &&
                 results['id'][0] as Long == id
     }
 }

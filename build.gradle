@@ -20,6 +20,7 @@ version '2.1-SNAPSHOT'
 repositories {
     mavenLocal()
     jcenter()
+    maven { url "https://repo.grails.org/grails/core" }
     maven { url "https://oss.sonatype.org/content/repositories/releases/" }
     mavenCentral()
 }

@@ -10,7 +10,7 @@ class Person implements GormEntity<Person> {
         name nullable: false
     }
 
-    static hasMany = [addresses: Address]
+    static hasMany = [addresses: Address, cats: String]
 
     static mapping = {
         version false

@@ -25,11 +25,14 @@ class PersonSpec extends GqlSpec {
                     new Query(AddressSpec.collectionName).size(20).skip(0).orderBy(['id']).select('id', 'line1')
                             .select(new Result(entityName).select('id'))
                             .select(new Query('tests').select('name', 'image'))
-        ).build()
+                )
+                .select(new Query('cats').size(20).select('value').page(Page.Info()))
+                .build()
         L.info(query)
 
         when:
-        LinkedHashMap result = q(query).data
+        def thing = q(query)
+        LinkedHashMap result = thing.data
         id = (result[collectionName][RESULTS]['id'] as List)[0] as Long
         address1 = (result[collectionName][RESULTS][AddressSpec.collectionName][RESULTS]['line1'] as List)[0][0]
         address2 = (result[collectionName][RESULTS][AddressSpec.collectionName][RESULTS]['line1'] as List)[1][0]
@@ -37,6 +40,7 @@ class PersonSpec extends GqlSpec {
         then:
         result[collectionName][RESULTS].size() == Schema.numberOfPeople &&
                 result[collectionName][PAGE_INFO][GraphUtils.INFO_TOTAL_COUNT_NAME] == Schema.numberOfPeople &&
+                result[collectionName][RESULTS]['cats'][PAGE_INFO][GraphUtils.INFO_TOTAL_COUNT_NAME][0] == 3 &&
                 result[collectionName][RESULTS][AddressSpec.collectionName][RESULTS][entityName]['id'].size() == Schema.numberOfPeople &&
                 result[collectionName][RESULTS][AddressSpec.collectionName][RESULTS]['tests'][RESULTS]['name'][0][0].size() == 3
     }
