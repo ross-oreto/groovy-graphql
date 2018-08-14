@@ -27,6 +27,7 @@ class PersonSpec extends GqlSpec {
                             .select(new Query('tests').select('name', 'image'))
                 )
                 .select(new Query('cats').size(20).select('value').page(Page.Info()))
+                .select(new Result(TestSpec.entityName).select('name'))
                 .build()
         L.info(query)
 
@@ -41,6 +42,7 @@ class PersonSpec extends GqlSpec {
         result[collectionName][RESULTS].size() == Schema.numberOfPeople &&
                 result[collectionName][PAGE_INFO][GraphUtils.INFO_TOTAL_COUNT_NAME] == Schema.numberOfPeople &&
                 result[collectionName][RESULTS]['cats'][PAGE_INFO][GraphUtils.INFO_TOTAL_COUNT_NAME][0] == 3 &&
+                result[collectionName][RESULTS][TestSpec.entityName]['name'][0] == 'one-to-one' &&
                 result[collectionName][RESULTS][AddressSpec.collectionName][RESULTS][entityName]['id'].size() == Schema.numberOfPeople &&
                 result[collectionName][RESULTS][AddressSpec.collectionName][RESULTS]['tests'][RESULTS]['name'][0][0].size() == 3
     }

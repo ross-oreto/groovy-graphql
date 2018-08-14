@@ -87,13 +87,13 @@ class GraphUtils {
                     def newEntity
                     if (params.containsKey(idName)) {
                         //newEntity."${idName}" = params.get(idName)
-                        entity.javaClass.withTransaction  { newEntity = entity.javaClass.get(params.get(idName)) }
+                        entity.javaClass.withTransaction { newEntity = entity.javaClass.get(params.get(idName)) }
                     }
                     if (newEntity == null) {
                         newEntity = entity.javaClass.newInstance()
                     }
                     grails.web.databinding.DataBindingUtils.bindObjectToInstance(newEntity, params, null, null, '')
-                    entity.javaClass.withTransaction  {
+                    entity.javaClass.withTransaction {
                         if (!newEntity.dirty) {
                             params.keySet().each {
                                 String field = it
@@ -169,8 +169,8 @@ class GraphUtils {
 
     static int DEFAULT_BATCH_SIZE = 200
 
-    static eagerFetch(Collection entities, PersistentEntity entity, List<Field> selections) {
-        def ids = entities.collect { it."${entity.identity.name}" }
+    static eagerFetch(Collection entities, PersistentEntity persistentEntity, List<Field> selections) {
+        def ids = entities.collect { it."${persistentEntity.identity.name}" }
         selections.each {
             def results = (it.selectionSet?.selections as List<Field>)?.find { it.name == PAGED_RESULTS_NAME }
             if (results) {
@@ -184,7 +184,7 @@ class GraphUtils {
                 int offset = skipArg instanceof NullValue ? 0 : skipArg?.value ?: 0
 
                 List<Field> resultSelections = results.selectionSet?.selections as List<Field>
-                Association association = getAssociation(entity, it.name)
+                Association association = getAssociation(persistentEntity, it.name)
 
                 int batchSize = GrailsDomainBinder.getMapping(association.associatedEntity?.javaClass)?.batchSize ?: DEFAULT_BATCH_SIZE
                 L.debug("${association.associatedEntity?.javaClass?.simpleName ?: association.name} batch size: $batchSize")
@@ -197,7 +197,7 @@ class GraphUtils {
                 int i = 1
                 ids.collate(batchSize).each { idBatch ->
                     L.debug("batch: $i")
-                    String criteria = GqlToCriteria.transformEagerBatch(entity
+                    String criteria = GqlToCriteria.transformEagerBatch(persistentEntity
                             , idBatch
                             , association
                             , resultSelections
@@ -220,7 +220,7 @@ class GraphUtils {
                             , fieldsWithoutId(resultSelections, association.associatedEntity))
                     def propertyName = it.name
                     entities.each {
-                        def id = it."${entity.identity.name}"
+                        def id = it."${persistentEntity.identity.name}"
                         if (entityMap.containsKey(id)) {
                             it."$propertyName" = entityMap.get(id).sort{ a, b ->
                                 int compare = 0
@@ -254,12 +254,23 @@ class GraphUtils {
             } else if (it.selectionSet) {
                 def subEntities = []
                 def propertyName = it.name
-                entities.each {
-                    def e = it."$propertyName"
+                entities.each { entity ->
+                    def e = entity."$propertyName"
                     if (e) subEntities.add(e)
                 }
                 if (subEntities.size()) {
-                    def subEntity = getAssociation(entity, propertyName).associatedEntity
+                    def subEntity = getAssociation(persistentEntity, propertyName).associatedEntity
+                    String idName = subEntity.identity.name
+                    def eagerFetchResults = subEntity.javaClass.withTransaction {
+                        subEntity.javaClass.where {
+                            inList (idName, subEntities.collect{ it."${idName}" }.unique() )
+                        }.list()
+                    }
+                    subEntities.clear()
+                    entities.each { entity ->
+                        entity."$propertyName" = eagerFetchResults.find { it."${idName}" == entity."$propertyName"."${idName}"}
+                        subEntities.add( entity."$propertyName")
+                    }
                     eagerFetch(subEntities, subEntity, it.selectionSet.selections as List<Field>)
                 }
             }

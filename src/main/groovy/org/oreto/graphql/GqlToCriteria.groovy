@@ -211,8 +211,8 @@ $criteriaString-----------------------------------------------------------------
 //                addProjectionSelections(associatedEntity
 //                        , GraphUtils.selectionsWithoutId(results, associatedEntity), path, sb, objects)
             } else if (it.selectionSet) {
-                appendToCriteria("property('$property')", sb, objects)
                 def associatedEntity = GraphUtils.getAssociation(entity, it.name)?.associatedEntity
+                appendToCriteria("property('${property}.${associatedEntity.identity.name}')", sb, objects)
                 addProjectionSelections(associatedEntity
                         , GraphUtils.selectionsWithoutId(it, associatedEntity), property, sb, objects)
             } else {

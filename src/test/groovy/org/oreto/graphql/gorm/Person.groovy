@@ -8,6 +8,7 @@ class Person implements GormEntity<Person> {
 
     static constraints = {
         name nullable: false
+        test nullable: true
     }
 
     static hasMany = [addresses: Address, cats: String]
@@ -20,4 +21,6 @@ class Person implements GormEntity<Person> {
     Date dateCreated
     Date lastUpdated
     String name
+
+    Test test
 }

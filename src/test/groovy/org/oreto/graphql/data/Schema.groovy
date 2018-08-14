@@ -51,7 +51,7 @@ class Schema {
         Collection nouns = genson.deserialize(nounsData, String[].class)
 
         def people = names.subList(0, numberOfPeople).collect {
-            def p = new Person(name: it, cats: ['Misty', 'Leo', 'Jake'])
+            def p = new Person(name: it, cats: ['Misty', 'Leo', 'Jake'], test: new Test(name: 'one-to-one'))
             createAddresses(p, nouns)
             p
         }

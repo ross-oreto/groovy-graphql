@@ -12,6 +12,7 @@ class TestSpec extends GqlSpec {
     private static final Logger L = LoggerFactory.getLogger(TestSpec.class)
 
     static collectionName = 'tests'
+    static entityName = 'test'
 
     @Shared Long id
 
