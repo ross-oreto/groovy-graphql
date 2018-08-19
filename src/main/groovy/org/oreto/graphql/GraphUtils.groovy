@@ -206,7 +206,7 @@ class GraphUtils {
                 Association association = getAssociation(persistentEntity, it.name)
 
                 int batchSize = GrailsDomainBinder.getMapping(association.associatedEntity?.javaClass)?.batchSize ?: DEFAULT_BATCH_SIZE
-                L.info("${association.associatedEntity?.javaClass?.simpleName ?: association.name} batch size: $batchSize")
+                L.debug("${association.associatedEntity?.javaClass?.simpleName ?: association.name} batch size: $batchSize")
 
                 Collection eagerResults = []
                 def orderByArg = it.arguments.find { it.name == ORDERBY_ARG_NAME }?.value
@@ -215,7 +215,7 @@ class GraphUtils {
 
                 int i = 1
                 ids.collate(batchSize).each { idBatch ->
-                    L.info("batch: $i")
+                    L.debug("batch: $i")
                     String criteria = GqlToCriteria.transformEagerBatch(persistentEntity
                             , idBatch
                             , association
