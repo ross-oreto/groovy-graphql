@@ -49,6 +49,7 @@ class GraphUtils {
         Iterator<Map.Entry<String, PersistentEntity>> iterator = entities.entrySet().iterator()
         Map.Entry<String, PersistentEntity> entry = iterator.next()
         def entityQueries = entityToFilterQuery(entry.key, entry.value, (typeMap = [:]))
+        entityQueries = entityQueries << entityToGetQuery(entry.value, typeMap)
 
         while(iterator.hasNext()) {
             entry = iterator.next()
@@ -205,7 +206,7 @@ class GraphUtils {
                 Association association = getAssociation(persistentEntity, it.name)
 
                 int batchSize = GrailsDomainBinder.getMapping(association.associatedEntity?.javaClass)?.batchSize ?: DEFAULT_BATCH_SIZE
-                L.debug("${association.associatedEntity?.javaClass?.simpleName ?: association.name} batch size: $batchSize")
+                L.info("${association.associatedEntity?.javaClass?.simpleName ?: association.name} batch size: $batchSize")
 
                 Collection eagerResults = []
                 def orderByArg = it.arguments.find { it.name == ORDERBY_ARG_NAME }?.value
@@ -214,7 +215,7 @@ class GraphUtils {
 
                 int i = 1
                 ids.collate(batchSize).each { idBatch ->
-                    L.debug("batch: $i")
+                    L.info("batch: $i")
                     String criteria = GqlToCriteria.transformEagerBatch(persistentEntity
                             , idBatch
                             , association
@@ -523,37 +524,29 @@ class GraphUtils {
                                 int offset = (env.getArgument(SKIP_ARG_NAME) ?: 0) as int
                                 String filter = env.getArgument(FILTER_ARG_NAME) as String
 
-                                if (env.getSource()?."$property.name" == null) {
-                                    String propertyName = getPropertyNameForAssociation(association, env.getSource().class)
-                                    def id = env.getSource()."${entity.identity.name}"
-                                    def filterWithId = JSON.parse(filter ?: '{}') as Map<String, Object>
-                                    filterWithId.put(propertyName, [(entity.identity.name): id])
-                                    filter = genson.serialize(filterWithId)
+                                String propertyName = getPropertyNameForAssociation(association, env.getSource().class)
+                                def id = env.getSource()."${entity.identity.name}"
+                                def filterWithId = JSON.parse(filter ?: '{}') as Map<String, Object>
+                                filterWithId.put(propertyName, [(entity.identity.name): id])
+                                filter = genson.serialize(filterWithId)
 
-                                    List<Field> selections = (env.selectionSet.get().get(PAGED_RESULTS_NAME)
-                                            ?.find { it.name == PAGED_RESULTS_NAME }
-                                            ?.selectionSet?.selections as List<Field>)
-                                            .findAll { it.name != associatedEntity.identity.name} ?: []
+                                List<Field> selections = (env.selectionSet.get().get(PAGED_RESULTS_NAME)
+                                        ?.find { it.name == PAGED_RESULTS_NAME }
+                                        ?.selectionSet?.selections as List<Field>)
+                                        .findAll { it.name != associatedEntity.identity.name } ?: []
 
-                                    List<String> criteriaList =
-                                            GqlToCriteria.transform(associatedEntity, selections, [
-                                                    (FILTER_ARG_NAME)   : filter
-                                                    , (SIZE_ARG_NAME)   : max
-                                                    , (SKIP_ARG_NAME)   : offset
-                                                    , (ORDERBY_ARG_NAME): env.getArgument(ORDERBY_ARG_NAME)
-                                            ])
-                                    def count = Eval.me(criteriaList[0]) as Collection
-                                    def results = Eval.me(criteriaList[1]) as Collection
-                                    def entities = resultSetToEntities(results, associatedEntity, selections)
-                                    new PagedGraphResults(entities
-                                            , max, offset, count[0] as int)
-                                } else {
-                                    LinkedHashSet entities = []
-                                    env.getSource().class.withTransaction {
-                                        entities = env.getSource()."$property.name"
-                                    }
-                                    new PagedGraphResults(entities, max, offset, entities.size())
-                                }
+                                List<String> criteriaList =
+                                        GqlToCriteria.transform(associatedEntity, selections, [
+                                                (FILTER_ARG_NAME)   : filter
+                                                , (SIZE_ARG_NAME)   : max
+                                                , (SKIP_ARG_NAME)   : offset
+                                                , (ORDERBY_ARG_NAME): env.getArgument(ORDERBY_ARG_NAME)
+                                        ])
+                                def count = Eval.me(criteriaList[0]) as Collection
+                                def results = Eval.me(criteriaList[1]) as Collection
+                                def entities = resultSetToEntities(results, associatedEntity, selections)
+                                new PagedGraphResults(entities
+                                        , max, offset, count[0] as int)
                             }
                         } }
                     }

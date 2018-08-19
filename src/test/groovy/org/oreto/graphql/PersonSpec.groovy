@@ -117,6 +117,28 @@ class PersonSpec extends GqlSpec {
         result.savePerson.name == 'updated person 1'
     }
 
+    def "get person"() {
+        setup:
+        String getQuery =
+                """query {
+    getPerson(id:$id) {
+        id
+        name
+        addresses {
+            results {
+                id
+                line1
+            }
+        }
+    }
+}"""
+        when:
+        LinkedHashMap result = q(getQuery).data
+
+        then:
+        result.getPerson.id == id
+    }
+
 //    def "criteria test"() {
 //        setup:
 //        List<Person> results = []

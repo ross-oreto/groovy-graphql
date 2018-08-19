@@ -47,6 +47,12 @@ class TestSpec extends GqlSpec {
     saveTest(params:"{ id:$id, name:'updated test' }") {
         id
         name
+        addresses {
+            results {
+                id
+                line1
+            }
+        }
     }
 }"""
         result = q(query).data
@@ -78,6 +84,12 @@ class TestSpec extends GqlSpec {
     deleteTest(id:$id) {
         id
         name
+        addresses {
+            results {
+                id
+                line1
+            }
+        }
     }
 }"""
         when:
