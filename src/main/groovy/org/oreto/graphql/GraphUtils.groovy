@@ -53,6 +53,7 @@ class GraphUtils {
         while(iterator.hasNext()) {
             entry = iterator.next()
             entityQueries = entityQueries << entityToFilterQuery(entry.key, entry.value, typeMap)
+            entityQueries = entityQueries << entityToGetQuery(entry.value, typeMap)
         }
 
         iterator = entities.entrySet().iterator()
@@ -124,6 +125,23 @@ class GraphUtils {
                         def deletedEntity = entity.javaClass.get(id)
                         deletedEntity.delete()
                         deletedEntity
+                    }
+                }
+            }
+        }
+        mutation
+    }
+
+    static Closure entityToGetQuery(PersistentEntity entity, Map<String, GraphQLOutputType> typeMap) {
+        String fieldName = "get${entity.javaClass.simpleName}"
+        Closure mutation = {
+            field(fieldName) {
+                type entityToType(entity, typeMap, false)
+                argument(ID_ARG_NAME, propertyToType(entity.identity))
+                fetcher { DataFetchingEnvironment env ->
+                    def id = env.getArgument(ID_ARG_NAME)
+                    entity.javaClass.withTransaction  {
+                        entity.javaClass.get(id)
                     }
                 }
             }

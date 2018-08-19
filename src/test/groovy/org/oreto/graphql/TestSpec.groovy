@@ -55,9 +55,25 @@ class TestSpec extends GqlSpec {
         result.saveTest.name == 'updated test'
     }
 
+    def "get test"() {
+        setup:
+        String getQuery =
+                """query {
+    getTest(id:$id) {
+        id
+        name
+    }
+}"""
+        when:
+        LinkedHashMap getResult = q(getQuery).data
+
+        then:
+        getResult.getTest.id == id
+    }
+
     def "delete test"() {
         setup:
-        String query =
+        String deleteQuery =
                 """mutation {
     deleteTest(id:$id) {
         id
@@ -65,7 +81,7 @@ class TestSpec extends GqlSpec {
     }
 }"""
         when:
-        LinkedHashMap result = q(query).data
+        LinkedHashMap result = q(deleteQuery).data
 
         then:
         result.deleteTest.id == id
