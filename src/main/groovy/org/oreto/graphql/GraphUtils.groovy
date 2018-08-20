@@ -89,7 +89,9 @@ class GraphUtils {
                     def newEntity
                     if (params.containsKey(idName)) {
                         //newEntity."${idName}" = params.get(idName)
-                        entity.javaClass.withTransaction { newEntity = entity.javaClass.get(params.get(idName)) }
+                        entity.javaClass.withTransaction {
+                            newEntity = entity.javaClass.get(params.get(idName))
+                        }
                     }
                     if (newEntity == null) {
                         newEntity = entity.javaClass.newInstance()
@@ -105,9 +107,8 @@ class GraphUtils {
                         }
                         newEntity = newEntity.save(failOnError:true)
                     }
-                    entity.javaClass.withTransaction {
-                        newEntity.refresh()
-                    }
+                    //get(newEntity."${idName}", entity, env)
+                    newEntity
                 }
             }
         }
@@ -122,11 +123,12 @@ class GraphUtils {
                 argument(ID_ARG_NAME, propertyToType(entity.identity))
                 fetcher { DataFetchingEnvironment env ->
                     def id = env.getArgument(ID_ARG_NAME)
+                    def deletedEntity = get(id, entity, env)
                     entity.javaClass.withTransaction  {
-                        def deletedEntity = entity.javaClass.get(id)
-                        deletedEntity.delete()
-                        deletedEntity
+                        deletedEntity?.delete()
+                        //entity.javaClass.get(id)?.delete()
                     }
+                    deletedEntity
                 }
             }
         }
@@ -140,14 +142,30 @@ class GraphUtils {
                 type entityToType(entity, typeMap, false)
                 argument(ID_ARG_NAME, propertyToType(entity.identity))
                 fetcher { DataFetchingEnvironment env ->
-                    def id = env.getArgument(ID_ARG_NAME)
-                    entity.javaClass.withTransaction  {
-                        entity.javaClass.get(id)
-                    }
+                    get(env.getArgument(ID_ARG_NAME), entity, env)
                 }
             }
         }
         mutation
+    }
+
+    static get(def id, PersistentEntity entity, DataFetchingEnvironment env) {
+        List<Field> selections = (env.selectionSet.get().get(PAGED_RESULTS_NAME)
+                ?.find { it.name == PAGED_RESULTS_NAME}
+                ?.selectionSet?.selections as List<Field>) ?: []
+
+        List<String> criteriaList =
+                GqlToCriteria.transform(entity
+                        , selections
+                        , [(FILTER_ARG_NAME) : "{${entity.identity.name}:$id}"
+                           , (SIZE_ARG_NAME) : 1
+                           , (SKIP_ARG_NAME) : 0
+                           , (ORDERBY_ARG_NAME) : null
+                ])
+        def results = Eval.me(criteriaList[1]) as Collection
+        def entities = resultSetToEntities(results, entity, fieldsWithoutId(selections, entity))
+        eagerFetch(entities, entity, selections)
+        entities?.size() ? entities[0] : null
     }
 
     static Closure entityToFilterQuery(String name, PersistentEntity entity, Map<String, GraphQLOutputType> typeMap) {
@@ -524,29 +542,37 @@ class GraphUtils {
                                 int offset = (env.getArgument(SKIP_ARG_NAME) ?: 0) as int
                                 String filter = env.getArgument(FILTER_ARG_NAME) as String
 
-                                String propertyName = getPropertyNameForAssociation(association, env.getSource().class)
-                                def id = env.getSource()."${entity.identity.name}"
-                                def filterWithId = JSON.parse(filter ?: '{}') as Map<String, Object>
-                                filterWithId.put(propertyName, [(entity.identity.name): id])
-                                filter = genson.serialize(filterWithId)
+                                if (env.getSource()?."$property.name" == null) {
+                                    String propertyName = getPropertyNameForAssociation(association, env.getSource().class)
+                                    def id = env.getSource()."${entity.identity.name}"
+                                    def filterWithId = JSON.parse(filter ?: '{}') as Map<String, Object>
+                                    filterWithId.put(propertyName, [(entity.identity.name): id])
+                                    filter = genson.serialize(filterWithId)
 
-                                List<Field> selections = (env.selectionSet.get().get(PAGED_RESULTS_NAME)
-                                        ?.find { it.name == PAGED_RESULTS_NAME }
-                                        ?.selectionSet?.selections as List<Field>)
-                                        .findAll { it.name != associatedEntity.identity.name } ?: []
+                                    List<Field> selections = (env.selectionSet.get().get(PAGED_RESULTS_NAME)
+                                            ?.find { it.name == PAGED_RESULTS_NAME }
+                                            ?.selectionSet?.selections as List<Field>)
+                                            .findAll { it.name != associatedEntity.identity.name} ?: []
 
-                                List<String> criteriaList =
-                                        GqlToCriteria.transform(associatedEntity, selections, [
-                                                (FILTER_ARG_NAME)   : filter
-                                                , (SIZE_ARG_NAME)   : max
-                                                , (SKIP_ARG_NAME)   : offset
-                                                , (ORDERBY_ARG_NAME): env.getArgument(ORDERBY_ARG_NAME)
-                                        ])
-                                def count = Eval.me(criteriaList[0]) as Collection
-                                def results = Eval.me(criteriaList[1]) as Collection
-                                def entities = resultSetToEntities(results, associatedEntity, selections)
-                                new PagedGraphResults(entities
-                                        , max, offset, count[0] as int)
+                                    List<String> criteriaList =
+                                            GqlToCriteria.transform(associatedEntity, selections, [
+                                                    (FILTER_ARG_NAME)   : filter
+                                                    , (SIZE_ARG_NAME)   : max
+                                                    , (SKIP_ARG_NAME)   : offset
+                                                    , (ORDERBY_ARG_NAME): env.getArgument(ORDERBY_ARG_NAME)
+                                            ])
+                                    def count = Eval.me(criteriaList[0]) as Collection
+                                    def results = Eval.me(criteriaList[1]) as Collection
+                                    def entities = resultSetToEntities(results, associatedEntity, selections)
+                                    new PagedGraphResults(entities
+                                            , max, offset, count[0] as int)
+                                } else {
+                                    LinkedHashSet entities = []
+                                    env.getSource().class.withTransaction {
+                                        entities = env.getSource()."$property.name"
+                                    }
+                                    new PagedGraphResults(entities, max, offset, entities.size())
+                                }
                             }
                         } }
                     }
