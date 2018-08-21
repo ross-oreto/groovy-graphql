@@ -107,8 +107,8 @@ class GraphUtils {
                         }
                         newEntity = newEntity.save(failOnError:true)
                     }
-                    //get(newEntity."${idName}", entity, env)
-                    newEntity
+                    def id = newEntity."${idName}"
+                    get(id, entity, env)
                 }
             }
         }
@@ -137,7 +137,7 @@ class GraphUtils {
 
     static Closure entityToGetQuery(PersistentEntity entity, Map<String, GraphQLOutputType> typeMap) {
         String fieldName = "get${entity.javaClass.simpleName}"
-        Closure mutation = {
+        Closure query = {
             field(fieldName) {
                 type entityToType(entity, typeMap, false)
                 argument(ID_ARG_NAME, propertyToType(entity.identity))
@@ -146,14 +146,12 @@ class GraphUtils {
                 }
             }
         }
-        mutation
+        query
     }
 
     static get(def id, PersistentEntity entity, DataFetchingEnvironment env) {
-        List<Field> selections = (env.selectionSet.get().get(PAGED_RESULTS_NAME)
-                ?.find { it.name == PAGED_RESULTS_NAME}
-                ?.selectionSet?.selections as List<Field>) ?: []
-
+        List<Field> selections = env.selectionSet.get()
+                .findAll { !it.key.contains('/') }.collect { it.value[0] }
         List<String> criteriaList =
                 GqlToCriteria.transform(entity
                         , selections
