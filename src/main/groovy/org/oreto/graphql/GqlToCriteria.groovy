@@ -5,6 +5,7 @@ import graphql.language.Field
 import org.grails.datastore.mapping.model.PersistentEntity
 import org.grails.datastore.mapping.model.PersistentProperty
 import org.grails.datastore.mapping.model.types.Association
+import org.grails.orm.hibernate.cfg.PropertyConfig
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -80,8 +81,11 @@ class GqlToCriteria {
 
         String distinctOrProperty = 'distinct'
         selections.each {
-            String type = entity.getPropertyByName(it.name).type.simpleName
-            if (type == 'byte[]' || type == 'Blob' || type == 'Clob') {
+            def property = entity.getPropertyByName(it.name)
+            def mapping = property.getMapping().mappedForm as PropertyConfig
+            boolean isLob = mapping.columns.findAll { String typeName = it.sqlType?.toLowerCase(); typeName == 'clob' || typeName == 'blob' }?.size() > 0
+            String type = property.type.simpleName
+            if (isLob || type == 'byte[]' || type == 'Blob' || type == 'Clob') {
                 distinctOrProperty = 'property'
             }
         }
