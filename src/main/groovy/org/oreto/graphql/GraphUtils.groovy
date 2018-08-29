@@ -142,7 +142,7 @@ class GraphUtils {
                 type entityToType(entity, typeMap, false)
                 argument(entity.identity.name, propertyToType(entity.identity))
                 fetcher { DataFetchingEnvironment env ->
-                    get(env.getArgument(ID_ARG_NAME), entity, env)
+                    get(env.getArgument(entity.identity.name), entity, env)
                 }
             }
         }
