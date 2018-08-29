@@ -56,32 +56,31 @@ class GqlToCriteria {
             , (ILIKE): GroovyOp.ILIKE
     ]
 
-    static List<String> transform(PersistentEntity entity
-                                  , List<Field> selections
-                                  , Map<String, Object> queryArgs) {
-        StringBuilder sb = new StringBuilder("${entity.javaClass.name}.withTransaction {\n")
-        List objects = ['withTransaction']
+    static List<Object> transform(PersistentEntity entity
+                                      , List<Field> selections
+                                      , Map<String, Object> queryArgs) {
+        StringBuilder sb = new StringBuilder()
+        StringBuilder subQuery = new StringBuilder()
+        List objects = []
         appendToCriteria("${entity.javaClass.name}.where {", sb, objects)
-        objects.add(entity.javaClass.name)
+        appendToCriteria("${entity.javaClass.name}.where {", subQuery, objects)
 
-        appendToCriteria("exists( ${entity.javaClass.name}.where {", sb, objects)
-        objects.add('exists')
-        appendToCriteria("setAlias('${entity.javaClass.simpleName.toLowerCase()}')", sb, objects)
-        appendToCriteria("eqProperty ('${entity.identity.name}', 'this.${entity.identity.name}')", sb, objects)
+        objects.add(entity.javaClass.name)
         String filter = queryArgs.get('filter') as String
         try {
-            _transform(entity, '', JSON.parse(filter ?: '{}') as Map<String, Object>, sb, objects)
+            _transform(entity, '', JSON.parse(filter ?: '{}') as Map<String, Object>, subQuery, objects)
         } catch (Exception exception) {
             throw new FilterException(exception.message + ":" + exception?.cause?.message)
         }
-        appendToCriteria("projections { property '${entity.identity.name}' }", sb, objects)
-        objects.pop()
-        appendToCriteria('})', sb, objects)
-        //addAliasSelections(selections, '', sb, aliasMap, objects)
+        int max = queryArgs.get(GraphUtils.SIZE_ARG_NAME) as int
+        int offset = queryArgs.get(GraphUtils.SKIP_ARG_NAME) as int
 
-        String countCriteria = "${sb.toString()} }.count()\n}"
-        def orderByArg = queryArgs.get(GraphUtils.ORDERBY_ARG_NAME)
-        List<String> orderBy = orderByArg instanceof Collection ? orderByArg as List<String> : [orderByArg as String]
+        String countDistinctProjection = "projections { countDistinct('${entity.identity.name}') }"
+        String countCriteria = "${subQuery.toString()} $countDistinctProjection\n}"
+
+        objects.pop()
+        appendToCriteria("}.distinct('${entity.identity.name}').list([max:$max, offset:$offset])", subQuery, objects)
+        appendToCriteria("inList '${entity.identity.name}', idList", sb, objects)
 
         appendToCriteria("projections {", sb, objects)
         objects.add('projections')
@@ -96,29 +95,27 @@ class GqlToCriteria {
         objects.pop()
         appendToCriteria("}", sb, objects)
 
+        def orderByArg = queryArgs.get(GraphUtils.ORDERBY_ARG_NAME)
+        List<String> orderBy = orderByArg instanceof Collection ? orderByArg as List<String> : [orderByArg as String]
         QueryUtils.parseOrderBy(orderBy, entity).each {
             appendToCriteria("order('${it.key}', '${it.value}')", sb, objects)
         }
-        objects.pop()
-        int max = queryArgs.get(GraphUtils.SIZE_ARG_NAME) as int
-        int offset = queryArgs.get(GraphUtils.SKIP_ARG_NAME) as int
 //        appendToCriteria("maxResults($max)", sb, objects)
-//        appendToCriteria("firstResult($offset)", sb, objects)
-        appendToCriteria("}.list([max:$max, offset:$offset])", sb, objects)
-        objects.pop()
-        appendToCriteria('}', sb, objects)
+//        appendToCriteria("firstResult($offset)", sb, objects) list([max:$max, offset:$offset])
+        appendToCriteria("}.list()", sb, objects)
 
-        String pagedCriteria = sb.toString()
-        String message = """
-------------------------------------------------------------------
-$countCriteria
-------------------------------------------------------------------
-$pagedCriteria------------------------------------------------------------------"""
-        L.debug(message)
-        [countCriteria, pagedCriteria]
+        String transactionBlock = """${entity.javaClass.name}.withTransaction {
+def count = $countCriteria
+def idList = ${subQuery.toString()}
+def results = ${sb.toString()}
+[count[0], results]
+}
+"""
+        L.debug(transactionBlock)
+        Eval.me(transactionBlock) as List
     }
 
-    static String transformEagerBatch(PersistentEntity parentEntity
+    static List transformEagerBatch(PersistentEntity parentEntity
                                       , Collection ids
                                       , Association association
                                       , List<Field> selections
@@ -195,7 +192,7 @@ $pagedCriteria------------------------------------------------------------------
 $criteriaString------------------------------------------------------------------
 """
         L.debug(message)
-        criteriaString
+        Eval.me(criteriaString) as List
     }
 
     static void addProjectionSelections(PersistentEntity entity

@@ -35,7 +35,7 @@ class AddressSpec extends GqlSpec {
 
     def "filter addresses"() {
         setup:
-        String query = new Query(collectionName).page(Page.Info()).filter("{ id: $id}")
+        String query = new Query(collectionName).page(Page.Info()).filter("{ id: $id, person: { addresses: { line1_not:null }} }")
                 .select('id', 'line1').select(new Result(PersonSpec.getEntityName()).select('id')).build()
         L.info(query)
 

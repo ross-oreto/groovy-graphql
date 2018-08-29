@@ -1,8 +1,6 @@
 package org.oreto.graphql
 
 import org.oreto.graphql.data.Schema
-import org.oreto.graphql.gorm.Address
-import org.oreto.graphql.gorm.Person
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import spock.lang.Shared
@@ -66,7 +64,7 @@ class PersonSpec extends GqlSpec {
 
     def "filter person addresses"() {
         setup:
-        String query = new Query(collectionName).page(Page.Info()).filter("{ addresses_contains:{ dateCreated_between: [ ['7-8-2000', [dateCreated]] ] } }")
+        String query = new Query(collectionName).page(Page.Info()).filter("{ addresses_contains:{ line1_contains:['a', 'e'], dateCreated_between: [ ['7-8-2000', [dateCreated]] ] } }")
                 .select('id', 'name').build()
         L.info(query)
 
@@ -141,29 +139,34 @@ class PersonSpec extends GqlSpec {
         result.getPerson.id == id
     }
 
-    def "criteria test"() {
-        setup:
-        def results = []
-
-        when:
-        Person.withTransaction {
-            results = Person.where {
-                projections {
-                    property "id"
-                    property "name"
-                }
-                exists( Address.where {
-                    setAlias('address')
-                    person { eqProperty ('id', 'this.id')}
-                    not { isNull('line1') }
-                    projections {
-                        property "id"
-                    }
-                })
-            }.list()
-        }
-
-        then:
-        results.size() == Schema.numberOfPeople
-    }
+//    def "criteria test"() {
+//        setup:
+//        def results = []
+//
+//        String g = """
+//org.oreto.graphql.gorm.Address.where {
+//person {
+//    addresses {
+//        like('line1','%a%')
+//    }
+//}}.distinct('id').list([max:20, offset:0])
+//"""
+//        //def list = Eval.me(g)
+//
+//        when:
+//        org.oreto.graphql.gorm.Address.withTransaction {
+//            org.oreto.graphql.gorm.Address.where {
+//                inList 'id', Eval.me(g)
+//                projections {
+//                    property('id')
+//                    property('line1')
+//                    property('person.id')
+//                }
+//                order('id', 'desc')
+//            }.list([max:20, offset:0])
+//        }
+//
+//        then:
+//        results.size() == Schema.numberOfPeople
+//    }
 }

@@ -140,7 +140,7 @@ class GraphUtils {
         Closure query = {
             field(fieldName) {
                 type entityToType(entity, typeMap, false)
-                argument(ID_ARG_NAME, propertyToType(entity.identity))
+                argument(entity.identity.name, propertyToType(entity.identity))
                 fetcher { DataFetchingEnvironment env ->
                     get(env.getArgument(ID_ARG_NAME), entity, env)
                 }
@@ -153,7 +153,7 @@ class GraphUtils {
         List<Field> selections = env.selectionSet.get()
                 .findAll { !it.key.contains('/') }.collect { it.value[0] }
         def idVal = entity.identity.type.simpleName == 'String' ? "'$id'" : id
-        List<String> criteriaList =
+        List<Object> criteriaList =
                 GqlToCriteria.transform(entity
                         , selections
                         , [(FILTER_ARG_NAME) : "{ ${entity.identity.name}:$idVal }"
@@ -161,8 +161,7 @@ class GraphUtils {
                            , (SKIP_ARG_NAME) : 0
                            , (ORDERBY_ARG_NAME) : null
                 ])
-        L.debug(criteriaList[1])
-        def results = Eval.me(criteriaList[1]) as Collection
+        def results = criteriaList[1] as Collection
         def entities = resultSetToEntities(results, entity, fieldsWithoutId(selections, entity))
         eagerFetch(entities, entity, selections)
         entities?.size() ? entities[0] : null
@@ -185,7 +184,7 @@ class GraphUtils {
                             ?.find { it.name == PAGED_RESULTS_NAME}
                             ?.selectionSet?.selections as List<Field>) ?: []
 
-                    List<String> criteriaList =
+                    List<Object> criteriaList =
                         GqlToCriteria.transform(entity
                                 , selections
                                 , [(FILTER_ARG_NAME) : env.getArgument(FILTER_ARG_NAME)
@@ -193,11 +192,11 @@ class GraphUtils {
                                 , (SKIP_ARG_NAME) : offset
                                 , (ORDERBY_ARG_NAME) : env.getArgument(ORDERBY_ARG_NAME)
                         ])
-                    def count = Eval.me(criteriaList[0]) as Collection
-                    def results = Eval.me(criteriaList[1]) as Collection
+                    def count = criteriaList[0] as int
+                    def results = criteriaList[1] as Collection
                     def entities = resultSetToEntities(results, entity, fieldsWithoutId(selections, entity))
-                    eagerFetch(entities, entity, selections)
-                    new PagedGraphResults(entities, max, offset, count[0] as int)
+                    eagerFetch(entities as Collection, entity, selections)
+                    new PagedGraphResults(entities, max, offset, count)
                 }
             }
         }
@@ -226,7 +225,7 @@ class GraphUtils {
                 int batchSize = GrailsDomainBinder.getMapping(association.associatedEntity?.javaClass)?.batchSize ?: DEFAULT_BATCH_SIZE
                 L.debug("${association.associatedEntity?.javaClass?.simpleName ?: association.name} batch size: $batchSize")
 
-                Collection eagerResults = []
+                List eagerResults = []
                 def orderByArg = it.arguments.find { it.name == ORDERBY_ARG_NAME }?.value
                 List<String> orderBy = orderByArg == null || orderByArg instanceof NullValue ? [] :
                         orderByArg instanceof Collection ? orderByArg?.values?.collect { it.value as String } : [orderByArg.value]
@@ -234,20 +233,20 @@ class GraphUtils {
                 int i = 1
                 ids.collate(batchSize).each { idBatch ->
                     L.debug("batch: $i")
-                    String criteria = GqlToCriteria.transformEagerBatch(persistentEntity
+                    List criteria = GqlToCriteria.transformEagerBatch(persistentEntity
                             , idBatch
                             , association
                             , resultSelections
                             , [(FILTER_ARG_NAME) : filter
                                , (SIZE_ARG_NAME) : 1000000
                                , (SKIP_ARG_NAME) : 0
-                               , (ORDERBY_ARG_NAME) : orderBy
-                    ])
+                               , (ORDERBY_ARG_NAME) : orderBy]
+                    )
                     if (eagerResults) {
-                        eagerResults.addAll(Eval.me(criteria) as Collection)
+                        eagerResults.addAll(criteria)
                     }
                     else {
-                        eagerResults = Eval.me(criteria) as Collection
+                        eagerResults = criteria
                     }
                     i++
                 }
@@ -559,18 +558,18 @@ ${subEntity.javaClass.name}.withTransaction {
                                             ?.selectionSet?.selections as List<Field>)
                                             .findAll { it.name != associatedEntity.identity.name} ?: []
 
-                                    List<String> criteriaList =
+                                    List<Object> criteriaList =
                                             GqlToCriteria.transform(associatedEntity, selections, [
                                                     (FILTER_ARG_NAME)   : filter
                                                     , (SIZE_ARG_NAME)   : max
                                                     , (SKIP_ARG_NAME)   : offset
                                                     , (ORDERBY_ARG_NAME): env.getArgument(ORDERBY_ARG_NAME)
                                             ])
-                                    def count = Eval.me(criteriaList[0]) as Collection
-                                    def results = Eval.me(criteriaList[1]) as Collection
+                                    def count = criteriaList[0] as int
+                                    def results = criteriaList[1] as Collection
                                     def entities = resultSetToEntities(results, associatedEntity, selections)
                                     new PagedGraphResults(entities
-                                            , max, offset, count[0] as int)
+                                            , max, offset, count)
                                 } else {
                                     LinkedHashSet entities = []
                                     env.getSource().class.withTransaction {
@@ -663,7 +662,12 @@ ${subEntity.javaClass.name}.withTransaction {
     }
 
     static boolean propertyIsCollection(PersistentProperty property) {
-        Collection.isAssignableFrom(property?.type)
+        Class type = property?.type
+        Set.isAssignableFrom(type) ||
+                List.isAssignableFrom(type) ||
+                Map.isAssignableFrom(type) ||
+                Collection.isAssignableFrom(type) ||
+                Iterable.isAssignableFrom(type)
     }
 
     static Association getAssociation(PersistentEntity entity, String field) {
