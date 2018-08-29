@@ -58,7 +58,7 @@ class GqlToCriteria {
 
     static List<Object> transform(PersistentEntity entity
                                       , List<Field> selections
-                                      , Map<String, Object> queryArgs) {
+                                      , Map<String, Object> queryArgs, boolean count = true) {
         StringBuilder sb = new StringBuilder()
         StringBuilder subQuery = new StringBuilder()
         List objects = []
@@ -76,7 +76,7 @@ class GqlToCriteria {
         int offset = queryArgs.get(GraphUtils.SKIP_ARG_NAME) as int
 
         String countDistinctProjection = "projections { countDistinct('${entity.identity.name}') }"
-        String countCriteria = "${subQuery.toString()} $countDistinctProjection\n}"
+        String countCriteria = "${subQuery.toString()} $countDistinctProjection\n}.list()"
 
         objects.pop()
         appendToCriteria("}.distinct('${entity.identity.name}').list([max:$max, offset:$offset])", subQuery, objects)
@@ -105,10 +105,10 @@ class GqlToCriteria {
         appendToCriteria("}.list()", sb, objects)
 
         String transactionBlock = """${entity.javaClass.name}.withTransaction {
-def count = $countCriteria
 def idList = ${subQuery.toString()}
-def results = ${sb.toString()}
-[count[0], results]
+def results = idList ? ${sb.toString()} : []
+def count = ${if(count) countCriteria + '[0]' else 'results.size()' }
+[count, results]
 }
 """
         L.debug(transactionBlock)

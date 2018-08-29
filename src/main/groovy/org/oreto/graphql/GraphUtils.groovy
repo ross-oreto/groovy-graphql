@@ -159,8 +159,7 @@ class GraphUtils {
                         , [(FILTER_ARG_NAME) : "{ ${entity.identity.name}:$idVal }"
                            , (SIZE_ARG_NAME) : 1
                            , (SKIP_ARG_NAME) : 0
-                           , (ORDERBY_ARG_NAME) : null
-                ])
+                           , (ORDERBY_ARG_NAME) : null], false)
         def results = criteriaList[1] as Collection
         def entities = resultSetToEntities(results, entity, fieldsWithoutId(selections, entity))
         eagerFetch(entities, entity, selections)
