@@ -5,7 +5,6 @@ import graphql.language.Field
 import org.grails.datastore.mapping.model.PersistentEntity
 import org.grails.datastore.mapping.model.PersistentProperty
 import org.grails.datastore.mapping.model.types.Association
-import org.grails.orm.hibernate.cfg.PropertyConfig
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -65,31 +64,29 @@ class GqlToCriteria {
         appendToCriteria("${entity.javaClass.name}.where {", sb, objects)
         objects.add(entity.javaClass.name)
 
+        appendToCriteria("exists( ${entity.javaClass.name}.where {", sb, objects)
+        objects.add('exists')
+        appendToCriteria("setAlias('${entity.javaClass.simpleName.toLowerCase()}')", sb, objects)
+        appendToCriteria("eqProperty ('${entity.identity.name}', 'this.${entity.identity.name}')", sb, objects)
         String filter = queryArgs.get('filter') as String
         try {
             _transform(entity, '', JSON.parse(filter ?: '{}') as Map<String, Object>, sb, objects)
         } catch (Exception exception) {
             throw new FilterException(exception.message + ":" + exception?.cause?.message)
         }
+        appendToCriteria("projections { property '${entity.identity.name}' }", sb, objects)
+        objects.pop()
+        appendToCriteria('})', sb, objects)
         //addAliasSelections(selections, '', sb, aliasMap, objects)
-        String countCriteria = "${sb.toString()}\t\tprojections { countDistinct('${entity.identity.name}') }\n\t}.list()\n}"
+
+        String countCriteria = "${sb.toString()} }.count()\n}"
         def orderByArg = queryArgs.get(GraphUtils.ORDERBY_ARG_NAME)
         List<String> orderBy = orderByArg instanceof Collection ? orderByArg as List<String> : [orderByArg as String]
 
         appendToCriteria("projections {", sb, objects)
         objects.add('projections')
 
-        String distinctOrProperty = 'distinct'
-        selections.each {
-            def property = entity.getPropertyByName(it.name)
-            def mapping = property.getMapping().mappedForm as PropertyConfig
-            boolean isLob = mapping.columns.findAll { String typeName = it.sqlType?.toLowerCase(); typeName == 'clob' || typeName == 'blob' }?.size() > 0
-            String type = property.type.simpleName
-            if (isLob || type == 'byte[]' || type == 'Blob' || type == 'Clob') {
-                distinctOrProperty = 'property'
-            }
-        }
-        appendToCriteria("$distinctOrProperty('${entity.identity.name}')", sb, objects)
+        appendToCriteria("property('${entity.identity.name}')", sb, objects)
         addProjectionSelections(entity
                 , GraphUtils.fieldsWithoutId(selections, entity)
                 , ''

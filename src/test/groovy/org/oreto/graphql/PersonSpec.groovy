@@ -1,6 +1,8 @@
 package org.oreto.graphql
 
 import org.oreto.graphql.data.Schema
+import org.oreto.graphql.gorm.Address
+import org.oreto.graphql.gorm.Person
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import spock.lang.Shared
@@ -14,7 +16,7 @@ class PersonSpec extends GqlSpec {
     static entityName = 'person'
     static collectionName = 'people'
 
-    @Shared Long id
+    @Shared String id
     @Shared String address1
     @Shared String address2
 
@@ -34,7 +36,7 @@ class PersonSpec extends GqlSpec {
         when:
         def thing = q(query)
         LinkedHashMap result = thing.data
-        id = (result[collectionName][RESULTS]['id'] as List)[0] as Long
+        id = (result[collectionName][RESULTS]['id'] as List)[0] as String
         address1 = (result[collectionName][RESULTS][AddressSpec.collectionName][RESULTS]['line1'] as List)[0][0]
         address2 = (result[collectionName][RESULTS][AddressSpec.collectionName][RESULTS]['line1'] as List)[1][0]
 
@@ -49,7 +51,7 @@ class PersonSpec extends GqlSpec {
 
     def "filter people"() {
         setup:
-        String query = new Query(collectionName).page(Page.Info()).filter("{ id: $id, id_between: [[id], 50000]}").select('id', 'name').build()
+        String query = new Query(collectionName).page(Page.Info()).filter("{ id: '$id'}").select('id', 'name').build()
         L.info(query)
 
         when:
@@ -59,7 +61,7 @@ class PersonSpec extends GqlSpec {
         then:
         results.size() == 1 &&
                 result[collectionName][PAGE_INFO][GraphUtils.INFO_TOTAL_COUNT_NAME] == 1 &&
-                results['id'][0] as Long == id
+                results['id'][0] as String == id
     }
 
     def "filter person addresses"() {
@@ -99,7 +101,7 @@ class PersonSpec extends GqlSpec {
         id = result.savePerson.id
         query =
                 """mutation {
-    savePerson(params:"{ id:$id, name:'updated person 1', 'addresses[1]':{ line1:'test address 2'} }") {
+    savePerson(params:"{ id:'$id', name:'updated person 1', 'addresses[1]':{ line1:'test address 2'} }") {
         id
         name
         addresses {
@@ -121,7 +123,7 @@ class PersonSpec extends GqlSpec {
         setup:
         String getQuery =
                 """query {
-    getPerson(id:$id) {
+    getPerson(id:"$id") {
         id
         name
         addresses {
@@ -139,18 +141,29 @@ class PersonSpec extends GqlSpec {
         result.getPerson.id == id
     }
 
-//    def "criteria test"() {
-//        setup:
-//        List<Person> results = []
-//
-//        when:
-//        Person.withNewSession {
-//            results = Person.where {
-//                name == name
-//            }.list()
-//        }
-//
-//        then:
-//        results.size() == Schema.numberOfPeople
-//    }
+    def "criteria test"() {
+        setup:
+        def results = []
+
+        when:
+        Person.withTransaction {
+            results = Person.where {
+                projections {
+                    property "id"
+                    property "name"
+                }
+                exists( Address.where {
+                    setAlias('address')
+                    person { eqProperty ('id', 'this.id')}
+                    not { isNull('line1') }
+                    projections {
+                        property "id"
+                    }
+                })
+            }.list()
+        }
+
+        then:
+        results.size() == Schema.numberOfPeople
+    }
 }

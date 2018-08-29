@@ -152,14 +152,16 @@ class GraphUtils {
     static get(def id, PersistentEntity entity, DataFetchingEnvironment env) {
         List<Field> selections = env.selectionSet.get()
                 .findAll { !it.key.contains('/') }.collect { it.value[0] }
+        def idVal = entity.identity.type.simpleName == 'String' ? "'$id'" : id
         List<String> criteriaList =
                 GqlToCriteria.transform(entity
                         , selections
-                        , [(FILTER_ARG_NAME) : "{${entity.identity.name}:$id}"
+                        , [(FILTER_ARG_NAME) : "{ ${entity.identity.name}:$idVal }"
                            , (SIZE_ARG_NAME) : 1
                            , (SKIP_ARG_NAME) : 0
                            , (ORDERBY_ARG_NAME) : null
                 ])
+        L.debug(criteriaList[1])
         def results = Eval.me(criteriaList[1]) as Collection
         def entities = resultSetToEntities(results, entity, fieldsWithoutId(selections, entity))
         eagerFetch(entities, entity, selections)
@@ -205,7 +207,7 @@ class GraphUtils {
     static int DEFAULT_BATCH_SIZE = 200
 
     static eagerFetch(Collection entities, PersistentEntity persistentEntity, List<Field> selections) {
-        def ids = entities.collect { it."${persistentEntity.identity.name}" }
+        def ids = entities.collect { it?."${persistentEntity.identity.name}" }
         selections.each {
             def results = (it.selectionSet?.selections as List<Field>)?.find { it.name == PAGED_RESULTS_NAME }
             if (results) {
@@ -296,11 +298,16 @@ class GraphUtils {
                 if (subEntities.size()) {
                     def subEntity = getAssociation(persistentEntity, propertyName).associatedEntity
                     String idName = subEntity.identity.name
-                    def eagerFetchResults = subEntity.javaClass.withTransaction {
-                        subEntity.javaClass.where {
-                            inList (idName, subEntities.collect{ it."${idName}" }.unique() )
-                        }.list()
-                    }
+                    def inCollection = subEntities.collect{ GqlToCriteria.resolveSingleValue(it."${idName}", subEntity.identity.type.simpleName) }.unique()
+                    def criteria = """
+${subEntity.javaClass.name}.withTransaction {
+    ${subEntity.javaClass.name}.where {
+        inList ('$idName', $inCollection)
+    }.list()
+}
+"""
+                    L.debug(criteria)
+                    def eagerFetchResults = Eval.me(criteria)
                     subEntities.clear()
                     entities.each { entity ->
                         entity."$propertyName" = eagerFetchResults.find { it."${idName}" == entity."$propertyName"."${idName}"}

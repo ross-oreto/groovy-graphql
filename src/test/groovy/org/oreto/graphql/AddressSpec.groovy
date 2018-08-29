@@ -46,7 +46,7 @@ class AddressSpec extends GqlSpec {
         then:
         results.size() == 1 &&
                 result[collectionName][PAGE_INFO][GraphUtils.INFO_TOTAL_COUNT_NAME] == 1 &&
-                result[collectionName][RESULTS][PersonSpec.getEntityName()]['id'][0] > 0 &&
+                result[collectionName][RESULTS][PersonSpec.getEntityName()]['id'][0] != '' &&
                 results['id'][0] as Long == id
     }
 }

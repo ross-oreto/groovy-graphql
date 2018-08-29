@@ -14,12 +14,14 @@ class Person implements GormEntity<Person> {
     static hasMany = [addresses: Address, cats: String]
 
     static mapping = {
+        id generator:'uuid'
         version false
         batchSize 100
     }
 
     Date dateCreated
     Date lastUpdated
+    String id
     String name
 
     Test test
