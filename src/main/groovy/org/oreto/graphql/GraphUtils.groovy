@@ -249,44 +249,46 @@ class GraphUtils {
                     }
                     i++
                 }
-                if (eagerResults?.size()) {
-                    def entityMap = resultSetToEntityMap(eagerResults
-                            , association.associatedEntity
-                            , fieldsWithoutId(resultSelections, association.associatedEntity))
-                    def propertyName = it.name
-                    entities.each {
-                        def id = it."${persistentEntity.identity.name}"
-                        if (entityMap.containsKey(id)) {
-                            def childEntities = entityMap.get(id)
-                            it._sizes.put(propertyName, childEntities?.size() ?: 0)
-                            it."$propertyName" = childEntities.sort{ a, b ->
-                                int compare = 0
-                                for(Map.Entry<String, String> order : QueryUtils.parseOrderBy(orderBy, association.associatedEntity)) {
-                                    if (order.value == 'asc') {
-                                        compare = a."${order.key}" <=> b."${order.key}"
-                                    } else {
-                                        compare = b."${order.key}" <=> a."${order.key}"
+                persistentEntity.javaClass.withTransaction { transaction ->
+                    if (eagerResults?.size()) {
+                        def entityMap = resultSetToEntityMap(eagerResults
+                                , association.associatedEntity
+                                , fieldsWithoutId(resultSelections, association.associatedEntity))
+                        def propertyName = it.name
+                        entities.each {
+                            def id = it."${persistentEntity.identity.name}"
+                            if (entityMap.containsKey(id)) {
+                                def childEntities = entityMap.get(id)
+                                it._sizes.put(propertyName, childEntities?.size() ?: 0)
+                                it."$propertyName" = childEntities.sort { a, b ->
+                                    int compare = 0
+                                    for (Map.Entry<String, String> order : QueryUtils.parseOrderBy(orderBy, association.associatedEntity)) {
+                                        if (order.value == 'asc') {
+                                            compare = a."${order.key}" <=> b."${order.key}"
+                                        } else {
+                                            compare = b."${order.key}" <=> a."${order.key}"
+                                        }
+                                        if (compare != 0) break
                                     }
-                                    if (compare != 0) break
-                                }
-                                compare
-                            }.drop(offset).take(max)
-                        } else {
+                                    compare
+                                }.drop(offset).take(max)
+                            } else {
+                                it."$propertyName" = []
+                                it._sizes.put(propertyName, 0)
+                            }
+                        }
+                        if (entityMap.size() > 0) {
+                            def newEntities = []
+                            entityMap.each { newEntities.addAll(it.value) }
+                            if (newEntities.size()) {
+                                eagerFetch(newEntities, association.associatedEntity, resultSelections)
+                            }
+                        }
+                    } else {
+                        def propertyName = it.name
+                        entities.each {
                             it."$propertyName" = []
-                            it._sizes.put(propertyName, 0)
                         }
-                    }
-                    if (entityMap.size() > 0) {
-                        def newEntities = []
-                        entityMap.each { newEntities.addAll(it.value) }
-                        if (newEntities.size()) {
-                            eagerFetch(newEntities, association.associatedEntity, resultSelections)
-                        }
-                    }
-                } else {
-                    def propertyName = it.name
-                    entities.each {
-                        it."$propertyName" = []
                     }
                 }
             } else if (it.selectionSet) {
