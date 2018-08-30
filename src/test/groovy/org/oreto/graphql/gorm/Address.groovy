@@ -2,9 +2,10 @@ package org.oreto.graphql.gorm
 
 import grails.gorm.annotation.Entity
 import org.grails.datastore.gorm.GormEntity
+import org.oreto.graphql.EntityTrait
 
 @Entity
-class Address implements GormEntity<Address> {
+class Address implements GormEntity<Address>, EntityTrait {
 
     static constraints = {
         line1 nullable: true

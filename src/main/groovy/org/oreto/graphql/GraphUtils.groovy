@@ -257,7 +257,9 @@ class GraphUtils {
                     entities.each {
                         def id = it."${persistentEntity.identity.name}"
                         if (entityMap.containsKey(id)) {
-                            it."$propertyName" = entityMap.get(id).sort{ a, b ->
+                            def childEntities = entityMap.get(id)
+                            it._sizes.put(propertyName, childEntities?.size() ?: 0)
+                            it."$propertyName" = childEntities.sort{ a, b ->
                                 int compare = 0
                                 for(Map.Entry<String, String> order : QueryUtils.parseOrderBy(orderBy, association.associatedEntity)) {
                                     if (order.value == 'asc') {
@@ -271,6 +273,7 @@ class GraphUtils {
                             }.drop(offset).take(max)
                         } else {
                             it."$propertyName" = []
+                            it._sizes.put(propertyName, 0)
                         }
                     }
                     if (entityMap.size() > 0) {
@@ -574,7 +577,8 @@ ${subEntity.javaClass.name}.withTransaction {
                                     env.getSource().class.withTransaction {
                                         entities = env.getSource()."$property.name"
                                     }
-                                    new PagedGraphResults(entities, max, offset, entities.size())
+                                    int count = env.getSource()._sizes.get(property.name) ?: 0
+                                    new PagedGraphResults(entities, max, offset, count)
                                 }
                             }
                         } }
