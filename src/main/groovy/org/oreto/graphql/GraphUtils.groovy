@@ -311,8 +311,12 @@ ${subEntity.javaClass.name}.withTransaction {
                     def eagerFetchResults = Eval.me(criteria)
                     subEntities.clear()
                     entities.each { entity ->
-                        entity."$propertyName" = eagerFetchResults.find { it."${idName}" == entity."$propertyName"."${idName}"}
-                        subEntities.add( entity."$propertyName")
+                        if (entity."$propertyName") {
+                            entity."$propertyName" = eagerFetchResults.find {
+                                it."${idName}" == entity."$propertyName"."${idName}"
+                            }
+                            subEntities.add(entity."$propertyName")
+                        }
                     }
                     eagerFetch(subEntities, subEntity, it.selectionSet.selections as List<Field>)
                 }
