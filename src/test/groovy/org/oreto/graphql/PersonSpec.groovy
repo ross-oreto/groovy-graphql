@@ -116,8 +116,15 @@ class PersonSpec extends GqlSpec {
 
         when:
         LinkedHashMap result = q(query).data
-        id = result.savePerson.id
-        query =
+
+        then:
+        result.savePerson.id != null
+        result.savePerson.name == 'test person 1'
+    }
+
+    def "update person"() {
+        setup:
+        String query =
                 """mutation {
     savePerson(params:"{ id:'$id', name:'updated person 1', 'addresses[1]':{ line1:'test address 2'} }") {
         id
@@ -130,7 +137,10 @@ class PersonSpec extends GqlSpec {
         }
     }
 }"""
-        result = q(query).data
+        L.info(query)
+
+        when:
+        LinkedHashMap result = q(query).data
 
         then:
         result.savePerson.id != null

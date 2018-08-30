@@ -85,20 +85,20 @@ class GraphUtils {
                 type entityToType(entity, typeMap, false)
                 argument(PARAMS_ARG_NAME, GraphQLString)
                 fetcher { DataFetchingEnvironment env ->
-                    def params = JSON.parse((env.getArgument(PARAMS_ARG_NAME) ?: '{}') as String) as Map<String, Object>
-                    String idName = entity.identity.name
-                    def newEntity
-                    if (params.containsKey(idName)) {
-                        //newEntity."${idName}" = params.get(idName)
-                        entity.javaClass.withTransaction {
+                    def id = 0
+                    entity.javaClass.withTransaction {
+                        def params = JSON.parse((env.getArgument(PARAMS_ARG_NAME) ?: '{}') as String) as Map<String, Object>
+                        String idName = entity.identity.name
+                        def newEntity
+                        if (params.containsKey(idName)) {
+                            //newEntity."${idName}" = params.get(idName)
                             newEntity = entity.javaClass.get(params.get(idName))
                         }
-                    }
-                    if (newEntity == null) {
-                        newEntity = entity.javaClass.newInstance()
-                    }
-                    grails.web.databinding.DataBindingUtils.bindObjectToInstance(newEntity, params, null, null, '')
-                    entity.javaClass.withTransaction {
+                        if (newEntity == null) {
+                            newEntity = entity.javaClass.newInstance()
+                        }
+                        grails.web.databinding.DataBindingUtils.bindObjectToInstance(newEntity, params, null, null, '')
+
                         if (!newEntity.dirty) {
                             params.keySet().each {
                                 String field = it
@@ -106,9 +106,10 @@ class GraphUtils {
                                 newEntity.markDirty(field)
                             }
                         }
-                        newEntity = newEntity.save(failOnError:true)
+                        newEntity = newEntity.save(failOnError: true)
+
+                        id = newEntity."${idName}"
                     }
-                    def id = newEntity."${idName}"
                     get(id, entity, env)
                 }
             }
