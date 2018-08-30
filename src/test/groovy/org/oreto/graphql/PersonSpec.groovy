@@ -52,7 +52,7 @@ class PersonSpec extends GqlSpec {
         String query = new Query(collectionName).size(50).page(Page.Info()).select('id', 'name')
                 .select(new Result(TestSpec.entityName).select('name')
                 .select(
-                    new Query(AddressSpec.collectionName).size(20).skip(0).orderBy(['id']).select('id', 'line1')
+                    new Query(AddressSpec.collectionName).size(20).skip(0).orderBy(['id', 'line1']).select('id', 'line1')
                             .select(new Result(entityName).select('id'))
                             .select(new Query('tests').select('name', 'image'))
                  )).build()

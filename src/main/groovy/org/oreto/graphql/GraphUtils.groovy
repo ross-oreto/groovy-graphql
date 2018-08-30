@@ -5,6 +5,7 @@ import com.owlike.genson.GensonBuilder
 import gql.DSL
 import gql.dsl.ScalarsAware
 import grails.converters.JSON
+import graphql.language.ArrayValue
 import graphql.language.Field
 import graphql.language.NullValue
 import graphql.schema.*
@@ -227,7 +228,7 @@ class GraphUtils {
                 List eagerResults = []
                 def orderByArg = it.arguments.find { it.name == ORDERBY_ARG_NAME }?.value
                 List<String> orderBy = orderByArg == null || orderByArg instanceof NullValue ? [] :
-                        orderByArg instanceof Collection ? orderByArg?.values?.collect { it.value as String } : [orderByArg.value]
+                        orderByArg instanceof ArrayValue ? orderByArg?.values?.collect { it.value as String } : [orderByArg.value]
 
                 int i = 1
                 ids.collate(batchSize).each { idBatch ->
