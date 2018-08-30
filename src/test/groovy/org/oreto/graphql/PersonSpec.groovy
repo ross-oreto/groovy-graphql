@@ -47,6 +47,26 @@ class PersonSpec extends GqlSpec {
                 result[collectionName][RESULTS][AddressSpec.collectionName][RESULTS]['tests'][RESULTS]['name'][0][0].size() == 3
     }
 
+    def "query people test"() {
+        setup:
+        String query = new Query(collectionName).size(50).page(Page.Info()).select('id', 'name')
+                .select(new Result(TestSpec.entityName).select('name')
+                .select(
+                    new Query(AddressSpec.collectionName).size(20).skip(0).orderBy(['id']).select('id', 'line1')
+                            .select(new Result(entityName).select('id'))
+                            .select(new Query('tests').select('name', 'image'))
+                 )).build()
+        L.info(query)
+
+        when:
+        LinkedHashMap result = q(query).data
+        List results = result[collectionName][RESULTS] as List
+
+        then:
+        results.size() == Schema.numberOfPeople &&
+                result[collectionName][PAGE_INFO][GraphUtils.INFO_TOTAL_COUNT_NAME] == Schema.numberOfPeople
+    }
+
     def "filter people"() {
         setup:
         String query = new Query(collectionName).page(Page.Info()).filter("{ id: '$id'}").select('id', 'name').build()

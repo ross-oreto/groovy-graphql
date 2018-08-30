@@ -249,46 +249,44 @@ class GraphUtils {
                     }
                     i++
                 }
-                persistentEntity.javaClass.withTransaction { transaction ->
-                    if (eagerResults?.size()) {
-                        def entityMap = resultSetToEntityMap(eagerResults
-                                , association.associatedEntity
-                                , fieldsWithoutId(resultSelections, association.associatedEntity))
-                        def propertyName = it.name
-                        entities.each {
-                            def id = it."${persistentEntity.identity.name}"
-                            if (entityMap.containsKey(id)) {
-                                def childEntities = entityMap.get(id)
-                                it._sizes.put(propertyName, childEntities?.size() ?: 0)
-                                it."$propertyName" = childEntities.sort { a, b ->
-                                    int compare = 0
-                                    for (Map.Entry<String, String> order : QueryUtils.parseOrderBy(orderBy, association.associatedEntity)) {
-                                        if (order.value == 'asc') {
-                                            compare = a."${order.key}" <=> b."${order.key}"
-                                        } else {
-                                            compare = b."${order.key}" <=> a."${order.key}"
-                                        }
-                                        if (compare != 0) break
+                if (eagerResults?.size()) {
+                    def entityMap = resultSetToEntityMap(eagerResults
+                            , association.associatedEntity
+                            , fieldsWithoutId(resultSelections, association.associatedEntity))
+                    def propertyName = it.name
+                    entities.each {
+                        def id = it."${persistentEntity.identity.name}"
+                        if (entityMap.containsKey(id)) {
+                            def childEntities = entityMap.get(id)
+                            it._sizes.put(propertyName, childEntities?.size() ?: 0)
+                            it."$propertyName" = childEntities.sort{ a, b ->
+                                int compare = 0
+                                for(Map.Entry<String, String> order : QueryUtils.parseOrderBy(orderBy, association.associatedEntity)) {
+                                    if (order.value == 'asc') {
+                                        compare = a."${order.key}" <=> b."${order.key}"
+                                    } else {
+                                        compare = b."${order.key}" <=> a."${order.key}"
                                     }
-                                    compare
-                                }.drop(offset).take(max)
-                            } else {
-                                it."$propertyName" = []
-                                it._sizes.put(propertyName, 0)
-                            }
-                        }
-                        if (entityMap.size() > 0) {
-                            def newEntities = []
-                            entityMap.each { newEntities.addAll(it.value) }
-                            if (newEntities.size()) {
-                                eagerFetch(newEntities, association.associatedEntity, resultSelections)
-                            }
-                        }
-                    } else {
-                        def propertyName = it.name
-                        entities.each {
+                                    if (compare != 0) break
+                                }
+                                compare
+                            }.drop(offset).take(max)
+                        } else {
                             it."$propertyName" = []
+                            it._sizes.put(propertyName, 0)
                         }
+                    }
+                    if (entityMap.size() > 0) {
+                        def newEntities = []
+                        entityMap.each { newEntities.addAll(it.value) }
+                        if (newEntities.size()) {
+                            eagerFetch(newEntities, association.associatedEntity, resultSelections)
+                        }
+                    }
+                } else {
+                    def propertyName = it.name
+                    entities.each {
+                        it."$propertyName" = []
                     }
                 }
             } else if (it.selectionSet) {
@@ -302,15 +300,31 @@ class GraphUtils {
                     def subEntity = getAssociation(persistentEntity, propertyName).associatedEntity
                     String idName = subEntity.identity.name
                     def inCollection = subEntities.collect{ GqlToCriteria.resolveSingleValue(it."${idName}", subEntity.identity.type.simpleName) }.unique()
+
+                    def subEntityAssociations = subEntity.associations.collect { it.name }
+                    def nonAssociations = [subEntity.identity.name] + subEntity.persistentProperties
+                            .findAll{ !subEntityAssociations.contains(it.name) && it.name != 'version' }
+                            .collect{ it.name }
+                    def projectionProps = nonAssociations.collect { "property('${it}')" }.join('\t\t\n')
                     def criteria = """
 ${subEntity.javaClass.name}.withTransaction {
-    ${subEntity.javaClass.name}.where {
-        inList ('$idName', $inCollection)
-    }.list()
+${subEntity.javaClass.name}.where {
+    inList ('$idName', $inCollection)
+    projections {
+        $projectionProps
+    }
+ }.list()
 }
 """
                     L.debug(criteria)
-                    def eagerFetchResults = Eval.me(criteria)
+                    Collection resultSet = Eval.me(criteria) as Collection
+                    def eagerFetchResults =  resultSet.collect { Object[] row ->
+                        def newEntity = subEntity.javaClass.newInstance()
+                        nonAssociations.eachWithIndex { String entry, int i ->
+                            newEntity."${entry}" = row[i]
+                        }
+                        newEntity
+                    }
                     subEntities.clear()
                     entities.each { entity ->
                         if (entity."$propertyName") {
