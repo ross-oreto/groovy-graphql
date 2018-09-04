@@ -17,6 +17,7 @@ class Person implements GormEntity<Person>, EntityTrait {
     static mapping = {
         id generator:'uuid'
         version false
+        addresses cascade: 'all'
         batchSize 100
     }
 

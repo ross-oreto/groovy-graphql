@@ -18,6 +18,7 @@ class Address implements GormEntity<Address>, EntityTrait {
     }
 
     static hasMany = [tests: Test]
+    static belongsTo = [person: Person]
 
     static mapping = {
         version false
@@ -35,6 +36,4 @@ class Address implements GormEntity<Address>, EntityTrait {
     String state
     String country
     String postalCode
-
-    Person person
 }

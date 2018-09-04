@@ -15,6 +15,7 @@ class PersonSpec extends GqlSpec {
     static collectionName = 'people'
 
     @Shared String id
+    @Shared Integer addressId
     @Shared String address1
     @Shared String address2
 
@@ -101,13 +102,19 @@ class PersonSpec extends GqlSpec {
         setup:
         String query =
                 """mutation {
-    savePerson(params:"{ name:'test person 1', 'addresses[0]':{ line1:'test address 1'} }") {
+    savePerson(params:"{ name:'test person 1', 'addresses[0]':{ line1:'test address 1', 'tests[0]':{ name: 'blah' }} }") {
         id
         name
         addresses {
             results {
                 id
                 line1
+                tests {
+                    results {
+                        id
+                        name
+                   }
+                }
             }
         }
     }
@@ -116,23 +123,33 @@ class PersonSpec extends GqlSpec {
 
         when:
         LinkedHashMap result = q(query).data
+        id = result.savePerson.id
+        addressId = result.savePerson.addresses.results[0].id
 
         then:
         result.savePerson.id != null
         result.savePerson.name == 'test person 1'
+        result.savePerson.addresses.results[0].line1 == 'test address 1'
+        result.savePerson.addresses.results[0][TestSpec.collectionName][RESULTS][0].name == 'blah'
     }
 
     def "update person"() {
         setup:
         String query =
                 """mutation {
-    savePerson(params:"{ id:'$id', name:'updated person 1', 'addresses[1]':{ line1:'test address 2'} }") {
+    savePerson(params:"{ id:'$id', name:'updated person 1', 'addresses[0]':{ id: $addressId, tests:null } }") {
         id
         name
         addresses {
             results {
                 id
                 line1
+                tests {
+                    results {
+                        id
+                        name
+                   }
+                }
             }
         }
     }
@@ -145,6 +162,8 @@ class PersonSpec extends GqlSpec {
         then:
         result.savePerson.id != null
         result.savePerson.name == 'updated person 1'
+        result.savePerson.addresses.results.size() == 1
+        result.savePerson.addresses.results[0][TestSpec.collectionName][RESULTS].size() == 0
     }
 
     def "get person"() {
