@@ -99,14 +99,6 @@ class GraphUtils {
                         dataBind(newEntity, params, entity.associations)
                         newEntity.save(failOnError: true, flush: true)
                         id = newEntity."${idName}"
-
-//                        if (!newEntity.dirty) {
-//                            params.keySet().each {
-//                                String field = it
-//                                if (field.contains('[')) field = field.substring(0, field.indexOf('['))
-//                                newEntity.markDirty(field)
-//                            }
-//                        }
                     }
                     get(id, entity, env)
                 }
@@ -131,10 +123,11 @@ class GraphUtils {
 
                 if (Collection.isAssignableFrom(association.type)) {
                     def l = []
-                    l += entity."${association.name}"
+                    l += entity."${key}"
                     l?.each { existing ->
                         if (existing && !objectMaps.find { it.containsKey(idName) && it.get(idName) == existing."$idName" }) {
-                            entity."removeFrom${association.name.capitalize()}"(existing)
+                            entity."removeFrom${key.capitalize()}"(existing)
+                            entity.markDirty(key)
                         }
                     }
                 }
@@ -152,12 +145,15 @@ class GraphUtils {
                     if (Collection.isAssignableFrom(association.type)) {
                         def idValue = newEntity."$idName"
                         if (idValue == null) {
-                            entity."addTo${association.name.capitalize()}"(newEntity)
-                        } else if (!entity."${association.name}".find { it."$idName" == idValue }) {
-                            entity."addTo${association.name.capitalize()}"(newEntity)
+                            entity."addTo${key.capitalize()}"(newEntity)
+                            entity.markDirty(key)
+                        } else if (!entity."${key}".find { it."$idName" == idValue }) {
+                            entity."addTo${key.capitalize()}"(newEntity)
+                            entity.markDirty(key)
                         }
                     } else {
                         entity."$key" = newEntity
+                        entity.markDirty(key)
                     }
                 }
             } else {
