@@ -95,11 +95,8 @@ class GraphUtils {
                         }
                         if (newEntity == null) {
                             newEntity = entity.javaClass.newInstance()
-                        } else if (removeAssociations(newEntity, params, entity.associations, [newEntity]) > 0) {
-                            newEntity.save(failOnError: true, flush: true)
                         }
-                        grails.web.databinding.DataBindingUtils.bindObjectToInstance(newEntity, params, null, null, '')
-                        addAssociations(newEntity, entity.associations, [newEntity])
+                        dataBind(newEntity, params, entity.associations)
                         newEntity.save(failOnError: true, flush: true)
                         id = newEntity."${idName}"
 
@@ -118,54 +115,56 @@ class GraphUtils {
         mutation
     }
 
-    static int addAssociations(Object entity, List<Association> associations, List<Object> visited) {
-        int modify = 0
-        associations = associations.findAll { it.associatedEntity && Collection.isAssignableFrom(it.type) }
-        associations.each { Association association ->
-            Collection collection = entity."${association.name}"
-            if (collection) {
-                collection.each { child ->
-                    if (!visited.contains(child)) {
-                        entity."addTo${association.name.capitalize()}"(child)
-                        modify++
-                        visited.add(child)
-                        modify += addAssociations(child, association.associatedEntity.associations, visited)
-                    }
-                }
-            }
-        }
-        modify
-    }
+    static Object dataBind(Object entity, Map<String, Object> params, List<Association> associations) {
+        params.each { String key, Object value ->
+            Association association = associations.find { key == it.name }
+            if (association && association.associatedEntity) {
+                PersistentEntity associatedEntity = association.associatedEntity
+                String idName = associatedEntity.identity.name
 
-    static int removeAssociations(Object entity, Map<String, Object> params, List<Association> associations, List<Object> visited) {
-        int modify = 0
-        def dirty = params.keySet().collect {
-            it.contains('[') ? it.substring(0, it.indexOf('[')) : it
-        }
-        associations = associations.findAll { it.associatedEntity && Collection.isAssignableFrom(it.type) && dirty.contains(it.name) }
-        associations?.each { Association association ->
-            def l = []
-            l += entity?."${association.name}"
-            l?.each { child ->
-                if (!visited.contains(child)) {
-                    entity."removeFrom${association.name.capitalize()}"(child)
-                    modify++
-                    visited.add(child)
-                    String idName = association.associatedEntity.identity.name
-                    def parameters = null
-                    params.each {
-                        String key = it.key.contains('[') ? it.key.substring(0, it.key.indexOf('[')) : it.key
-                        if(key == association.name && it.value?."${idName}" == child."$idName" ) {
-                            parameters = it.value
+                Collection<Map<String, Object>> objectMaps
+                if (value instanceof Map) {
+                    objectMaps = [value as Map<String, Object>]
+                } else {
+                    objectMaps = value as Collection<Map<String, Object>>
+                }
+
+                if (Collection.isAssignableFrom(association.type)) {
+                    def l = []
+                    l += entity."${association.name}"
+                    l?.each { existing ->
+                        if (existing && !objectMaps.find { it.containsKey(idName) && it.get(idName) == existing."$idName" }) {
+                            entity."removeFrom${association.name.capitalize()}"(existing)
                         }
                     }
-                    if (parameters) {
-                        modify += removeAssociations(child, parameters, association.associatedEntity.associations, visited)
+                }
+
+                objectMaps.each { Map<String, Object> objectMap ->
+                    def newEntity = null
+                    if (objectMap.containsKey(idName)) {
+                        newEntity = associatedEntity.javaClass.get(objectMap.get(idName))
+                    }
+                    if (!newEntity) {
+                        newEntity = associatedEntity.javaClass.newInstance()
+                        newEntity."$idName" = objectMap.containsKey(idName) ? objectMap.get(idName) : null
+                    }
+                    dataBind(newEntity, objectMap, associatedEntity.associations)
+                    if (Collection.isAssignableFrom(association.type)) {
+                        def idValue = newEntity."$idName"
+                        if (idValue == null) {
+                            entity."addTo${association.name.capitalize()}"(newEntity)
+                        } else if (!entity."${association.name}".find { it."$idName" == idValue }) {
+                            entity."addTo${association.name.capitalize()}"(newEntity)
+                        }
+                    } else {
+                        entity."$key" = newEntity
                     }
                 }
+            } else {
+                entity."$key" = value
             }
         }
-        modify
+        entity
     }
 
     static Closure entityToDeleteQuery(PersistentEntity entity, Map<String, GraphQLOutputType> typeMap) {

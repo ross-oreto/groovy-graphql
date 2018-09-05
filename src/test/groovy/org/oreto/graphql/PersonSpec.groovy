@@ -102,7 +102,7 @@ class PersonSpec extends GqlSpec {
         setup:
         String query =
                 """mutation {
-    savePerson(params:"{ name:'test person 1', 'addresses[0]':{ line1:'test address 1', 'tests[0]':{ name: 'blah' }} }") {
+    savePerson(params:"{ name:'test person 1', 'addresses':[{ line1:'test address 1', 'tests':[ { name: 'blah' }] }] }") {
         id
         name
         addresses {
@@ -137,7 +137,7 @@ class PersonSpec extends GqlSpec {
         setup:
         String query =
                 """mutation {
-    savePerson(params:"{ id:'$id', name:'updated person 1', 'addresses[0]':{ id: $addressId, tests:null } }") {
+    savePerson(params:"{ id:'$id', name:'updated person 1', 'addresses':[{ id: $addressId, tests:null }] }") {
         id
         name
         addresses {
