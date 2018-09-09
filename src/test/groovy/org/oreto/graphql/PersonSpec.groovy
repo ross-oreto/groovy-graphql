@@ -145,7 +145,7 @@ class PersonSpec extends GqlSpec {
         setup:
         String query =
                 """mutation {
-    savePerson(params:"{ id:'$id', name:'updated person 1', test3:{id:$testId}, 'addresses':[{ id: $addressId, tests:null }] }") {
+    savePerson(params:"{ id:'$id', name:'updated person 1', test:null, test3:{id:$testId}, 'addresses':[{ id: $addressId, tests:null }] }") {
         id
         name
         test {
@@ -178,7 +178,7 @@ class PersonSpec extends GqlSpec {
         then:
         result.savePerson.id != null
         result.savePerson.name == 'updated person 1'
-        result.savePerson['test'].name == 'testing'
+        result.savePerson['test'] == null
         result.savePerson['test3'].name == 'blah'
         result.savePerson.addresses.results.size() == 1
         result.savePerson.addresses.results[0][TestSpec.collectionName][RESULTS].size() == 0

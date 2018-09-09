@@ -110,7 +110,7 @@ class GraphUtils {
     static Object dataBind(Object entity, Map<String, Object> params, List<Association> associations) {
         params.each { String key, Object value ->
             Association association = associations.find { key == it.name }
-            if (association && association.associatedEntity) {
+            if (value != null && association && association.associatedEntity) {
                 PersistentEntity associatedEntity = association.associatedEntity
                 String idName = associatedEntity.identity.name
 
