@@ -19,7 +19,7 @@ class AddressSpec extends GqlSpec {
         setup:
         String query = new Query(collectionName).page(Page.Info()).select('id', 'line1')
                 .select(
-                new Result(PersonSpec.entityName).select('id')
+                new Result(PersonSpec.entityName).select('id' ,'name')
         ).build()
         L.info(query)
 
@@ -35,8 +35,8 @@ class AddressSpec extends GqlSpec {
 
     def "filter addresses"() {
         setup:
-        String query = new Query(collectionName).page(Page.Info()).filter("{ id: $id, person: { addresses: { line1_not:null }} }")
-                .select('id', 'line1').select(new Result(PersonSpec.getEntityName()).select('id')).build()
+        String query = new Query(collectionName).page(Page.Info()).filter("{ person: { addresses: { line1_not:null }} }")
+                .select('id', 'line1').select(new Result(PersonSpec.getEntityName()).select('id', 'name')).build()
         L.info(query)
 
         when:
@@ -44,9 +44,8 @@ class AddressSpec extends GqlSpec {
         List results = result[collectionName][RESULTS] as List
 
         then:
-        results.size() == 1 &&
-                result[collectionName][PAGE_INFO][GraphUtils.INFO_TOTAL_COUNT_NAME] == 1 &&
-                result[collectionName][RESULTS][PersonSpec.getEntityName()]['id'][0] != '' &&
-                results['id'][0] as Long == id
+        results.size() == GraphUtils.DEFAULT_SIZE &&
+                result[collectionName][PAGE_INFO][GraphUtils.INFO_TOTAL_COUNT_NAME] > 1 &&
+                result[collectionName][RESULTS][PersonSpec.getEntityName()]['id'][0] != ''
     }
 }

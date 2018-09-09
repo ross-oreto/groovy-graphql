@@ -153,7 +153,6 @@ class GraphUtils {
                         }
                     } else {
                         entity."$key" = newEntity
-                        entity.markDirty(key)
                     }
                 }
             } else {
@@ -200,6 +199,7 @@ class GraphUtils {
     static get(def id, PersistentEntity entity, DataFetchingEnvironment env) {
         List<Field> selections = env.selectionSet.get()
                 .findAll { !it.key.contains('/') }.collect { it.value[0] }
+
         def idVal = entity.identity.type.simpleName == 'String' ? "'$id'" : id
         List<Object> criteriaList =
                 GqlToCriteria.transform(entity
@@ -210,7 +210,9 @@ class GraphUtils {
                            , (ORDERBY_ARG_NAME) : null], false)
         def results = criteriaList[1] as Collection
         def entities = resultSetToEntities(results, entity, fieldsWithoutId(selections, entity))
-        eagerFetch(entities, entity, selections)
+        if (entities.size() > 0) {
+            eagerFetch(entities, entity, selections)
+        }
         entities?.size() ? entities[0] : null
     }
 
@@ -242,7 +244,9 @@ class GraphUtils {
                     def count = criteriaList[0] as int
                     def results = criteriaList[1] as Collection
                     def entities = resultSetToEntities(results, entity, fieldsWithoutId(selections, entity))
-                    eagerFetch(entities as Collection, entity, selections)
+                    if (entities.size() > 0) {
+                        eagerFetch(entities as Collection, entity, selections)
+                    }
                     new PagedGraphResults(entities, max, offset, count)
                 }
             }
@@ -254,12 +258,12 @@ class GraphUtils {
 
     static eagerFetch(Collection entities, PersistentEntity persistentEntity, List<Field> selections) {
         def ids = entities.collect { it?."${persistentEntity.identity.name}" }
-        selections.each {
-            def results = (it.selectionSet?.selections as List<Field>)?.find { it.name == PAGED_RESULTS_NAME }
+        for (Field selection : selections) {
+            def results = (selection.selectionSet?.selections as List<Field>)?.find { it.name == PAGED_RESULTS_NAME }
             if (results) {
-                def filterArg = it.arguments.find { it.name == FILTER_ARG_NAME }?.value
-                def sizeArg = it.arguments.find { it.name == SIZE_ARG_NAME }?.value
-                def skipArg = it.arguments.find { it.name == SKIP_ARG_NAME }?.value
+                def filterArg = selection.arguments.find { it.name == FILTER_ARG_NAME }?.value
+                def sizeArg = selection.arguments.find { it.name == SIZE_ARG_NAME }?.value
+                def skipArg = selection.arguments.find { it.name == SKIP_ARG_NAME }?.value
 
                 String filter = filterArg instanceof NullValue ? '{}' : filterArg?.value ?: '{}'
                 int max = sizeArg instanceof NullValue ? DEFAULT_SIZE : sizeArg?.value ?: DEFAULT_SIZE
@@ -267,13 +271,13 @@ class GraphUtils {
                 int offset = skipArg instanceof NullValue ? 0 : skipArg?.value ?: 0
 
                 List<Field> resultSelections = results.selectionSet?.selections as List<Field>
-                Association association = getAssociation(persistentEntity, it.name)
+                Association association = getAssociation(persistentEntity, selection.name)
 
                 int batchSize = GrailsDomainBinder.getMapping(association.associatedEntity?.javaClass)?.batchSize ?: DEFAULT_BATCH_SIZE
                 L.debug("${association.associatedEntity?.javaClass?.simpleName ?: association.name} batch size: $batchSize")
 
                 List eagerResults = []
-                def orderByArg = it.arguments.find { it.name == ORDERBY_ARG_NAME }?.value
+                def orderByArg = selection.arguments.find { it.name == ORDERBY_ARG_NAME }?.value
                 List<String> orderBy = orderByArg == null || orderByArg instanceof NullValue ? [] :
                         orderByArg instanceof ArrayValue ? orderByArg?.values?.collect { it.value as String } : [orderByArg.value]
 
@@ -301,7 +305,7 @@ class GraphUtils {
                     def entityMap = resultSetToEntityMap(eagerResults
                             , association.associatedEntity
                             , fieldsWithoutId(resultSelections, association.associatedEntity))
-                    def propertyName = it.name
+                    def propertyName = selection.name
                     entities.each {
                         def id = it."${persistentEntity.identity.name}"
                         if (entityMap.containsKey(id)) {
@@ -332,57 +336,47 @@ class GraphUtils {
                         }
                     }
                 } else {
-                    def propertyName = it.name
+                    def propertyName = selection.name
                     entities.each {
                         it."$propertyName" = []
                     }
                 }
-            } else if (it.selectionSet) {
-                def subEntities = []
-                def propertyName = it.name
-                entities.each { entity ->
-                    def e = entity."$propertyName"
-                    if (e) subEntities.add(e)
-                }
-                if (subEntities.size()) {
-                    def subEntity = getAssociation(persistentEntity, propertyName).associatedEntity
-                    String idName = subEntity.identity.name
-                    def inCollection = subEntities.collect{ GqlToCriteria.resolveSingleValue(it."${idName}", subEntity.identity.type.simpleName) }.unique()
+            } else if (selection.selectionSet) {
+                def propertyName = selection.name
+                Association association = getAssociation(persistentEntity, propertyName)
+                def subEntity = association.associatedEntity
+                String idName = subEntity.identity.name
+                boolean idIsString = subEntity.identity.type.simpleName == 'String'
 
-                    def subEntityAssociations = subEntity.associations.collect { it.name }
-                    def nonAssociations = [subEntity.identity.name] + subEntity.persistentProperties
-                            .findAll{ !subEntityAssociations.contains(it.name) && it.name != 'version' }
-                            .collect{ it.name }
-                    def projectionProps = nonAssociations.collect { "property('${it}')" }.join('\t\t\n')
-                    def criteria = """
-${subEntity.javaClass.name}.withTransaction {
-${subEntity.javaClass.name}.where {
-    inList ('$idName', $inCollection)
-    projections {
-        $projectionProps
-    }
- }.list()
-}
-"""
-                    L.debug(criteria)
-                    Collection resultSet = Eval.me(criteria) as Collection
-                    def eagerFetchResults =  resultSet.collect { Object[] row ->
-                        def newEntity = subEntity.javaClass.newInstance()
-                        nonAssociations.eachWithIndex { String entry, int i ->
-                            newEntity."${entry}" = row[i]
-                        }
-                        newEntity
+                def subIds = []
+                entities.each {
+                    if (it."$propertyName" != null) {
+                        def idValue = it."$propertyName"."$idName"
+                        subIds.add(idIsString ? "'$idValue'" : idValue)
                     }
-                    subEntities.clear()
-                    entities.each { entity ->
-                        if (entity."$propertyName") {
-                            entity."$propertyName" = eagerFetchResults.find {
-                                it."${idName}" == entity."$propertyName"."${idName}"
-                            }
-                            subEntities.add(entity."$propertyName")
-                        }
+                }
+                List<Field> resultSelections = selection.selectionSet?.selections as List<Field>
+                List eagerResults = GqlToCriteria.transform(subEntity
+                        , resultSelections
+                        , [(FILTER_ARG_NAME) : "{ ${idName}_in: [${subIds.join(',')}]}"
+                           , (SIZE_ARG_NAME) : 1000000
+                           , (SKIP_ARG_NAME) : 0
+                           , (ORDERBY_ARG_NAME) : idName], false
+                )[1] as List
+                def newEntities = resultSetToEntities(eagerResults
+                        , subEntity
+                        , fieldsWithoutId(resultSelections, subEntity))
+                def matchedEntities = []
+                entities.each { e ->
+                    def id = e."$propertyName"?."${persistentEntity.identity.name}"
+                    def newEntity = newEntities.find { it."${persistentEntity.identity.name}" == id }
+                    if (id && newEntity) {
+                        e."$propertyName" = newEntity
+                        matchedEntities.add(newEntity)
                     }
-                    eagerFetch(subEntities, subEntity, it.selectionSet.selections as List<Field>)
+                }
+                if (newEntities.size() > 0) {
+                    eagerFetch(matchedEntities, subEntity, resultSelections)
                 }
             }
         }
@@ -515,9 +509,9 @@ ${subEntity.javaClass.name}.where {
                     newEntity."$name" = row[i]
                     i++
                 } else {
-                    def selections = selectionsWithoutId(it, entity)
+                    //def selections = selectionsWithoutId(it, entity)
                     def associatedEntity = entity.getAssociations().find{ it.name == name }.associatedEntity
-                    (association, i) = _resultSetToEntities(associatedEntity, selections, row, i, entities)
+                    (association, i) = _resultSetToEntities(associatedEntity, [], row, i, entities)
                     newEntity."$name" = association
                 }
             } else if(!name.startsWith('__')) {

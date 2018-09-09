@@ -13,10 +13,11 @@ class Test implements GormEntity<Test>, EntityTrait {
     }
 
     static hasMany = [addresses: Address]
-    static belongsTo = Address
+    static belongsTo = [Address]
 
     static mapping = {
         version false
+        addresses cascade: 'all'
         batchSize 100
     }
 

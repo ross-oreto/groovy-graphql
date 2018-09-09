@@ -68,7 +68,9 @@ class Schema {
                     , postalCode: '37216'
             )
             (1..3).each {
-                address.addToTests(new Test(name: "test$it", image: bytes))
+                Test test = new Test(name: "test$it", image: bytes)
+                test.addToAddresses(new Address(line1: 'standard test address'))
+                address.addToTests(test)
             }
             person.addToAddresses(address)
             address

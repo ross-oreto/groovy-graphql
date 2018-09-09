@@ -16,6 +16,7 @@ class PersonSpec extends GqlSpec {
 
     @Shared String id
     @Shared Integer addressId
+    @Shared Integer testId
     @Shared String address1
     @Shared String address2
 
@@ -24,7 +25,7 @@ class PersonSpec extends GqlSpec {
         String query = new Query(collectionName).size(50).page(Page.Info()).select('id', 'name')
                 .select(
                     new Query(AddressSpec.collectionName).size(20).skip(0).orderBy(['id']).select('id', 'line1')
-                            .select(new Result(entityName).select('id'))
+                            .select(new Result(entityName).select('id', 'name'))
                             .select(new Query('tests').select('name', 'image'))
                 )
                 .select(new Query('cats').size(20).select('value').page(Page.Info()))
@@ -44,6 +45,7 @@ class PersonSpec extends GqlSpec {
                 result[collectionName][PAGE_INFO][GraphUtils.INFO_TOTAL_COUNT_NAME] == Schema.numberOfPeople &&
                 result[collectionName][RESULTS]['cats'][PAGE_INFO][GraphUtils.INFO_TOTAL_COUNT_NAME][0] == 3 &&
                 result[collectionName][RESULTS][TestSpec.entityName]['name'][0] == 'one-to-one' &&
+                result[collectionName][RESULTS][0][AddressSpec.collectionName][RESULTS][0][entityName]['name'] != null &&
                 result[collectionName][RESULTS][AddressSpec.collectionName][RESULTS][entityName]['id'].size() == Schema.numberOfPeople &&
                 result[collectionName][RESULTS][AddressSpec.collectionName][RESULTS]['tests'][RESULTS]['name'][0][0].size() == 3
     }
@@ -54,7 +56,7 @@ class PersonSpec extends GqlSpec {
                 .select(new Result(TestSpec.entityName).select('name')
                 .select(
                     new Query(AddressSpec.collectionName).size(20).skip(0).orderBy(['id', 'line1']).select('id', 'line1')
-                            .select(new Result(entityName).select('id'))
+                            .select(new Result(entityName).select('id', 'name'))
                             .select(new Query('tests').select('name', 'image'))
                  )).build()
         L.info(query)
@@ -102,9 +104,13 @@ class PersonSpec extends GqlSpec {
         setup:
         String query =
                 """mutation {
-    savePerson(params:"{ name:'test person 1', 'addresses':[{ line1:'test address 1', 'tests':[ { name: 'blah' }] }] }") {
+    savePerson(params:"{ name:'test person 1', test:{name: 'testing'}, 'addresses':[{ line1:'test address 1', 'tests':[ { name: 'blah' }] }] }") {
         id
         name
+        test {
+            id
+            name
+        }
         addresses {
             results {
                 id
@@ -125,10 +131,12 @@ class PersonSpec extends GqlSpec {
         LinkedHashMap result = q(query).data
         id = result.savePerson.id
         addressId = result.savePerson.addresses.results[0].id
+        testId = result.savePerson.addresses.results[0][TestSpec.collectionName][RESULTS][0].id
 
         then:
         result.savePerson.id != null
         result.savePerson.name == 'test person 1'
+        result.savePerson.test.name == 'testing'
         result.savePerson.addresses.results[0].line1 == 'test address 1'
         result.savePerson.addresses.results[0][TestSpec.collectionName][RESULTS][0].name == 'blah'
     }
@@ -137,9 +145,17 @@ class PersonSpec extends GqlSpec {
         setup:
         String query =
                 """mutation {
-    savePerson(params:"{ id:'$id', name:'updated person 1', 'addresses':[{ id: $addressId, tests:null }] }") {
+    savePerson(params:"{ id:'$id', name:'updated person 1', test3:{id:$testId}, 'addresses':[{ id: $addressId, tests:null }] }") {
         id
         name
+        test {
+            id
+            name
+        }
+        test3 {
+            id
+            name
+        }
         addresses {
             results {
                 id
@@ -162,6 +178,8 @@ class PersonSpec extends GqlSpec {
         then:
         result.savePerson.id != null
         result.savePerson.name == 'updated person 1'
+        result.savePerson['test'].name == 'testing'
+        result.savePerson['test3'].name == 'blah'
         result.savePerson.addresses.results.size() == 1
         result.savePerson.addresses.results[0][TestSpec.collectionName][RESULTS].size() == 0
     }

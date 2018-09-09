@@ -15,6 +15,7 @@ class TestSpec extends GqlSpec {
     static entityName = 'test'
 
     @Shared Long id
+    @Shared Long addressId
 
     def "query tests"() {
         setup:
@@ -28,23 +29,29 @@ class TestSpec extends GqlSpec {
         result[collectionName][RESULTS].size() == GraphUtils.DEFAULT_SIZE
     }
 
-    def "save tests"() {
+    def "filter tests"() {
         setup:
-        String query =
-                """mutation {
-    saveTest(params:"{ name:'new test' }") {
-        id
-        name
-    }
-}"""
+        String query = new Query(collectionName)
+                .filter("{ addresses_not:null }")
+                .page(Page.Info())
+                .select('id', 'name', 'image')
+                .select(new Query(AddressSpec.collectionName).select('id', 'line1'))
+                .build()
         L.info(query)
 
         when:
         LinkedHashMap result = q(query).data
-        id = result.saveTest.id
-        query =
+        addressId = result[collectionName][RESULTS][0][AddressSpec.collectionName][RESULTS][0].id
+
+        then:
+        result[collectionName][RESULTS].size() == GraphUtils.DEFAULT_SIZE
+    }
+
+    def "save tests"() {
+        setup:
+        String query =
                 """mutation {
-    saveTest(params:"{ id:$id, name:'updated test' }") {
+    saveTest(params:"{ name:'new test', addresses:[{line1:'new test address'}] }") {
         id
         name
         addresses {
@@ -55,10 +62,40 @@ class TestSpec extends GqlSpec {
         }
     }
 }"""
-        result = q(query).data
+        L.info(query)
+
+        when:
+        LinkedHashMap result = q(query).data
+        id = result.saveTest.id
 
         then:
-        result.saveTest.name == 'updated test'
+        result.saveTest.name == 'new test'
+        result.saveTest.addresses.results[0].line1 == 'new test address'
+    }
+
+    def "update test"() {
+        setup:
+        String query =
+                """mutation {
+    saveTest(params:"{ id:$id, addresses:[{id:$addressId}] }") {
+        id
+        name
+        addresses {
+            results {
+                id
+                line1
+            }
+        }
+    }
+}"""
+        L.info(query)
+
+        when:
+        LinkedHashMap result = q(query).data
+
+        then:
+        result.saveTest.id == id
+        result.saveTest.addresses.results[0].id == addressId
     }
 
     def "get test"() {
