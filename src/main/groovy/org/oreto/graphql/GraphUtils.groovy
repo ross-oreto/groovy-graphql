@@ -356,13 +356,13 @@ class GraphUtils {
                     }
                 }
                 List<Field> resultSelections = selection.selectionSet?.selections as List<Field>
-                List eagerResults = GqlToCriteria.transform(subEntity
+                List eagerResults = subIds ? GqlToCriteria.transform(subEntity
                         , resultSelections
                         , [(FILTER_ARG_NAME) : "{ ${idName}_in: [${subIds.join(',')}]}"
                            , (SIZE_ARG_NAME) : 1000000
                            , (SKIP_ARG_NAME) : 0
                            , (ORDERBY_ARG_NAME) : idName], false
-                )[1] as List
+                )[1] as List : []
                 def newEntities = resultSetToEntities(eagerResults
                         , subEntity
                         , fieldsWithoutId(resultSelections, subEntity))
