@@ -104,9 +104,10 @@ class PersonSpec extends GqlSpec {
         setup:
         String query =
                 """mutation {
-    savePerson(params:"{ name:'test person 1', test:{name: 'testing'}, 'addresses':[{ line1:'test address 1', 'tests':[ { name: 'blah' }] }] }") {
+    savePerson(params:"{ name:'test person 1', testDate:'3-22-2018', test:{name: 'testing'}, 'addresses':[{ line1:'test address 1', 'tests':[ { name: 'blah' }] }] }") {
         id
         name
+        testDate
         test {
             id
             name
@@ -136,6 +137,7 @@ class PersonSpec extends GqlSpec {
         then:
         result.savePerson.id != null
         result.savePerson.name == 'test person 1'
+        result.savePerson.testDate.contains('3-22-2018')
         result.savePerson.test.name == 'testing'
         result.savePerson.addresses.results[0].line1 == 'test address 1'
         result.savePerson.addresses.results[0][TestSpec.collectionName][RESULTS][0].name == 'blah'

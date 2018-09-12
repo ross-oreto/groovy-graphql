@@ -132,11 +132,11 @@ class QueryUtils {
                     if (!isValueProperty(it)) {
                         String value = it.toString()
                         if (!value.isNumber()) {
-                            def date = dateFormatter1.parse(value, new ParsePosition(0))
+                            def date = dateTimeFormatter.parse(value, new ParsePosition(0))
                             if (!date) {
-                                date = dateFormatter2.parse(value, new ParsePosition(0))
+                                date = dateFormatter.parse(value, new ParsePosition(0))
                                 if (!date)
-                                    throw new FilterException("$op requires a number or date (${GqlToCriteria.format1}, ${GqlToCriteria.format2})")
+                                    throw new FilterException("$op requires a number or date (${GqlToCriteria.dateTimeFormat}, ${GqlToCriteria.dateFormat})")
                             }
                         }
                     }
@@ -158,8 +158,8 @@ class QueryUtils {
         }
     }
 
-    static SimpleDateFormat dateFormatter1 = new SimpleDateFormat(GqlToCriteria.format1)
-    static SimpleDateFormat dateFormatter2 = new SimpleDateFormat(GqlToCriteria.format2)
+    static SimpleDateFormat dateTimeFormatter = new SimpleDateFormat(GqlToCriteria.dateTimeFormat)
+    static SimpleDateFormat dateFormatter = new SimpleDateFormat(GqlToCriteria.dateFormat)
 
     static PersistentProperty getValueProperty(Object value, PersistentEntity persistentEntity) {
         Collection valueArray = value as Collection

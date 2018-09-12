@@ -96,7 +96,7 @@ class GraphUtils {
                         if (newEntity == null) {
                             newEntity = entity.javaClass.newInstance()
                         }
-                        dataBind(newEntity, params, entity.associations)
+                        dataBind(newEntity, params, entity.associations, entity)
                         newEntity.save(failOnError: true, flush: true)
                         id = newEntity."${idName}"
                     }
@@ -107,7 +107,7 @@ class GraphUtils {
         mutation
     }
 
-    static Object dataBind(Object entity, Map<String, Object> params, List<Association> associations) {
+    static Object dataBind(Object entity, Map<String, Object> params, List<Association> associations, PersistentEntity persistentEntity) {
         params.each { String key, Object value ->
             Association association = associations.find { key == it.name }
             if (value != null && association && association.associatedEntity) {
@@ -141,7 +141,7 @@ class GraphUtils {
                         newEntity = associatedEntity.javaClass.newInstance()
                         newEntity."$idName" = objectMap.containsKey(idName) ? objectMap.get(idName) : null
                     }
-                    dataBind(newEntity, objectMap, associatedEntity.associations)
+                    dataBind(newEntity, objectMap, associatedEntity.associations, associatedEntity)
                     if (Collection.isAssignableFrom(association.type)) {
                         def idValue = newEntity."$idName"
                         if (idValue == null) {
@@ -156,7 +156,16 @@ class GraphUtils {
                     }
                 }
             } else {
-                entity."$key" = value
+                PersistentProperty persistentProperty = persistentEntity.getPropertyByName(key)
+                if (persistentEntity) {
+                    if (Date.isAssignableFrom(persistentProperty.type) || persistentProperty.type.simpleName == 'Date') {
+                        String dateString = value as String
+                        entity."$key" = dateString.contains(' ') ?
+                                QueryUtils.dateTimeFormatter.parse(dateString) : QueryUtils.dateFormatter.parse(dateString)
+                    } else {
+                        entity."$key" = value
+                    }
+                }
             }
         }
         entity
@@ -703,11 +712,28 @@ class GraphUtils {
             case { it == 'byte[]' || it == 'Byte[]' && propertyName.toLowerCase().endsWith('image')}:
                 gtype = GraphQLByteString
                 break
+            case 'Date':
+                gtype = GraphQLDate
+                break
             default:
                 gtype = ScalarsAware.GraphQLString
                 break
         }
         gtype
+    }
+
+    static GraphQLScalarType GraphQLDate = DSL.scalar('DateTime') {
+        serialize { Date date ->
+            date.format(GqlToCriteria.dateTimeFormat)
+        }
+        parseLiteral { value ->
+            String dateString = value.value as String
+            dateString.contains(' ') ? QueryUtils.dateTimeFormatter.parse(dateString) : QueryUtils.dateFormatter.parse(dateString)
+        }
+        parseValue { String value ->
+            String dateString = value as String
+            dateString.contains(' ') ? QueryUtils.dateTimeFormatter.parse(dateString) : QueryUtils.dateFormatter.parse(dateString)
+        }
     }
 
     static GraphQLOutputType propertyToType(PersistentProperty property) {

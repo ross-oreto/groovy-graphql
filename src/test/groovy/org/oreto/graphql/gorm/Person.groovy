@@ -13,6 +13,7 @@ class Person implements GormEntity<Person>, EntityTrait {
         test2 nullable: true
         test3 nullable: true
         test4 nullable: true
+        testDate nullable: true
     }
 
     static hasMany = [addresses: Address, cats: String]
@@ -35,4 +36,6 @@ class Person implements GormEntity<Person>, EntityTrait {
     Test test2
     Test test3
     Test test4
+
+    Date testDate
 }
