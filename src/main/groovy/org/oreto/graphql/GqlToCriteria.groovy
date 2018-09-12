@@ -413,15 +413,13 @@ $criteriaString-----------------------------------------------------------------
         }
     }
 
-    static String dateTimeFormat = 'MM-dd-yyyy HH:mm:ss'
-    static String dateFormat = 'MM-dd-yyyy'
 
     static String resolveSingleValue(Object v, String type) {
         String s = v.toString()
         if (QueryUtils.isValueProperty(v)) v[0]
         else if (type == 'Date') {
-            if (s.contains(' ')) "new java.text.SimpleDateFormat('$dateTimeFormat').parse('$s')"
-            else "new java.text.SimpleDateFormat('$dateFormat').parse('$s')"
+            if (s.contains(' ')) "new java.text.SimpleDateFormat('${GraphUtils.dateTimeFormat}').parse('$s')"
+            else "new java.text.SimpleDateFormat('${GraphUtils.dateFormat}').parse('$s')"
         } else v instanceof String ? "'$s'" : (s.isNumber() ? toNumberWrapper(v, type) : s)
     }
 

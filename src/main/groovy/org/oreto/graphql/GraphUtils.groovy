@@ -18,6 +18,8 @@ import org.grails.orm.hibernate.cfg.PropertyConfig
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
+import java.text.SimpleDateFormat
+
 class GraphUtils {
 
     private static final Logger L = LoggerFactory.getLogger(GraphUtils.class)
@@ -40,6 +42,11 @@ class GraphUtils {
 
     static int DEFAULT_SIZE = 20
     static int MAX_SIZE = 1000
+
+    static String dateTimeFormat = 'MM-dd-yyyy HH:mm:ss'
+    static String dateFormat = 'MM-dd-yyyy'
+    static SimpleDateFormat dateTimeFormatter = new SimpleDateFormat(dateTimeFormat)
+    static SimpleDateFormat dateFormatter = new SimpleDateFormat(dateFormat)
 
     static Genson genson = new GensonBuilder().useStrictDoubleParse(false).create()
 
@@ -161,7 +168,7 @@ class GraphUtils {
                     if (Date.isAssignableFrom(persistentProperty.type) || persistentProperty.type.simpleName == 'Date') {
                         String dateString = value as String
                         entity."$key" = dateString.contains(' ') ?
-                                QueryUtils.dateTimeFormatter.parse(dateString) : QueryUtils.dateFormatter.parse(dateString)
+                                dateTimeFormatter.parse(dateString) : dateFormatter.parse(dateString)
                     } else {
                         entity."$key" = value
                     }
@@ -724,15 +731,15 @@ class GraphUtils {
 
     static GraphQLScalarType GraphQLDate = DSL.scalar('DateTime') {
         serialize { Date date ->
-            date.format(GqlToCriteria.dateTimeFormat)
+            date.format(dateTimeFormat)
         }
         parseLiteral { value ->
             String dateString = value.value as String
-            dateString.contains(' ') ? QueryUtils.dateTimeFormatter.parse(dateString) : QueryUtils.dateFormatter.parse(dateString)
+            dateString.contains(' ') ? dateTimeFormatter.parse(dateString) : dateFormatter.parse(dateString)
         }
         parseValue { String value ->
             String dateString = value as String
-            dateString.contains(' ') ? QueryUtils.dateTimeFormatter.parse(dateString) : QueryUtils.dateFormatter.parse(dateString)
+            dateString.contains(' ') ? dateTimeFormatter.parse(dateString) : dateFormatter.parse(dateString)
         }
     }
 

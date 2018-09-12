@@ -4,7 +4,6 @@ import org.grails.datastore.mapping.model.PersistentEntity
 import org.grails.datastore.mapping.model.PersistentProperty
 
 import java.text.ParsePosition
-import java.text.SimpleDateFormat
 
 class QueryUtils {
 
@@ -132,11 +131,11 @@ class QueryUtils {
                     if (!isValueProperty(it)) {
                         String value = it.toString()
                         if (!value.isNumber()) {
-                            def date = dateTimeFormatter.parse(value, new ParsePosition(0))
+                            def date = GraphUtils.dateTimeFormatter.parse(value, new ParsePosition(0))
                             if (!date) {
-                                date = dateFormatter.parse(value, new ParsePosition(0))
+                                date = GraphUtils.dateFormatter.parse(value, new ParsePosition(0))
                                 if (!date)
-                                    throw new FilterException("$op requires a number or date (${GqlToCriteria.dateTimeFormat}, ${GqlToCriteria.dateFormat})")
+                                    throw new FilterException("$op requires a number or date (${GraphUtils.dateTimeFormat}, ${GraphUtils.dateFormat})")
                             }
                         }
                     }
@@ -157,9 +156,6 @@ class QueryUtils {
 
         }
     }
-
-    static SimpleDateFormat dateTimeFormatter = new SimpleDateFormat(GqlToCriteria.dateTimeFormat)
-    static SimpleDateFormat dateFormatter = new SimpleDateFormat(GqlToCriteria.dateFormat)
 
     static PersistentProperty getValueProperty(Object value, PersistentEntity persistentEntity) {
         Collection valueArray = value as Collection
