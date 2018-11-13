@@ -9,6 +9,7 @@ import graphql.language.ArrayValue
 import graphql.language.Field
 import graphql.language.NullValue
 import graphql.schema.*
+import org.codehaus.groovy.runtime.DateGroovyMethods
 import org.grails.core.artefact.DomainClassArtefactHandler
 import org.grails.datastore.mapping.model.PersistentEntity
 import org.grails.datastore.mapping.model.PersistentProperty
@@ -731,7 +732,7 @@ class GraphUtils {
 
     static GraphQLScalarType GraphQLDate = DSL.scalar('DateTime') {
         serialize { Date date ->
-            date.format(dateTimeFormat)
+            DateGroovyMethods.format(date, dateTimeFormat)
         }
         parseLiteral { value ->
             String dateString = value.value as String
