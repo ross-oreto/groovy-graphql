@@ -19,6 +19,7 @@ import org.grails.orm.hibernate.cfg.PropertyConfig
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
+import java.sql.Timestamp
 import java.text.SimpleDateFormat
 
 class GraphUtils {
@@ -28,6 +29,7 @@ class GraphUtils {
     static String SIZE_ARG_NAME = 'size'
     static String SKIP_ARG_NAME = 'skip'
     static String FILTER_ARG_NAME = 'filter'
+    static String FORMAT_ARG_NAME = 'dateFormat'
     static String PARAMS_ARG_NAME = 'params'
     static String ID_ARG_NAME = 'id'
     static String ORDERBY_ARG_NAME = 'orderBy'
@@ -217,6 +219,7 @@ class GraphUtils {
         List<Field> selections = env.selectionSet.get()
                 .findAll { !it.key.contains('/') }.collect { it.value[0] }
 
+        String format = (env.getArgument(FORMAT_ARG_NAME) as String) ?: null
         def idVal = entity.identity.type.simpleName == 'String' ? "'$id'" : id
         List<Object> criteriaList =
                 GqlToCriteria.transform(entity
@@ -226,7 +229,7 @@ class GraphUtils {
                            , (SKIP_ARG_NAME) : 0
                            , (ORDERBY_ARG_NAME) : null], false)
         def results = criteriaList[1] as Collection
-        def entities = resultSetToEntities(results, entity, fieldsWithoutId(selections, entity))
+        def entities = resultSetToEntities(results, entity, fieldsWithoutId(selections, entity), format)
         if (entities.size() > 0) {
             eagerFetch(entities, entity, selections)
         }
@@ -240,6 +243,7 @@ class GraphUtils {
                 argument(SIZE_ARG_NAME, GraphQLInt)
                 argument(SKIP_ARG_NAME, GraphQLInt)
                 argument(ORDERBY_ARG_NAME, list(GraphQLString))
+                argument(FORMAT_ARG_NAME, GraphQLString)
                 type entityToType(entity, typeMap)
                 fetcher { DataFetchingEnvironment env ->
                     int max = env.getArgument(SIZE_ARG_NAME) ?: DEFAULT_SIZE
@@ -260,7 +264,8 @@ class GraphUtils {
                         ])
                     def count = criteriaList[0] as int
                     def results = criteriaList[1] as Collection
-                    def entities = resultSetToEntities(results, entity, fieldsWithoutId(selections, entity))
+                    def format = (env.getArgument(FORMAT_ARG_NAME) as String) ?: null
+                    def entities = resultSetToEntities(results, entity, fieldsWithoutId(selections, entity), format)
                     if (entities.size() > 0) {
                         eagerFetch(entities as Collection, entity, selections)
                     }
@@ -286,6 +291,7 @@ class GraphUtils {
                 int max = sizeArg instanceof NullValue ? DEFAULT_SIZE : sizeArg?.value ?: DEFAULT_SIZE
                 if (max > MAX_SIZE) max = MAX_SIZE
                 int offset = skipArg instanceof NullValue ? 0 : skipArg?.value ?: 0
+                String format = selection.arguments.find { it.name == FORMAT_ARG_NAME }?.value
 
                 List<Field> resultSelections = results.selectionSet?.selections as List<Field>
                 Association association = getAssociation(persistentEntity, selection.name)
@@ -321,7 +327,7 @@ class GraphUtils {
                 if (eagerResults?.size()) {
                     def entityMap = resultSetToEntityMap(eagerResults
                             , association.associatedEntity
-                            , fieldsWithoutId(resultSelections, association.associatedEntity))
+                            , fieldsWithoutId(resultSelections, association.associatedEntity), format)
                     def propertyName = selection.name
                     entities.each {
                         def id = it."${persistentEntity.identity.name}"
@@ -382,7 +388,8 @@ class GraphUtils {
                 )[1] as List : []
                 def newEntities = resultSetToEntities(eagerResults
                         , subEntity
-                        , fieldsWithoutId(resultSelections, subEntity))
+                        , fieldsWithoutId(resultSelections, subEntity)
+                        , null)
                 def matchedEntities = []
                 entities.each { e ->
                     def id = e."$propertyName"?."${persistentEntity.identity.name}"
@@ -470,18 +477,18 @@ class GraphUtils {
         }
     }
 
-    static List resultSetToEntities(Collection results, PersistentEntity entity, List<Field> fields) {
+    static List resultSetToEntities(Collection results, PersistentEntity entity, List<Field> fields, String format) {
         LinkedHashMap entities = new LinkedHashMap()
         results.collect { Object[] row ->
-            _resultSetToEntities(entity, fields, row, 0, entities)[0]
+            _resultSetToEntities(entity, fields, row, 0, entities, format)[0]
         }
     }
 
-    static Map<Object, Collection> resultSetToEntityMap(Collection results, PersistentEntity entity, List<Field> fields) {
+    static Map<Object, Collection> resultSetToEntityMap(Collection results, PersistentEntity entity, List<Field> fields, String format) {
         LinkedHashMap entities = new LinkedHashMap()
         Map<Object, Collection> entityMap = new LinkedHashMap<Object, Collection>()
         results.collect { Object[] row ->
-            def newEntity = _resultSetToEntities(entity, fields, row, 1, entities)[0]
+            def newEntity = _resultSetToEntities(entity, fields, row, 1, entities, format)[0]
             if (entityMap.containsKey(row[0])) {
                 entityMap.get(row[0]).add(newEntity)
             } else {
@@ -495,7 +502,8 @@ class GraphUtils {
                                              , List<Field> fields
                                              , Object[] row
                                              , int i
-                                             , LinkedHashMap entities) {
+                                             , LinkedHashMap entities
+                                             , String format) {
         def newEntity = null, association
 
         String id = row[i]
@@ -528,11 +536,17 @@ class GraphUtils {
                 } else {
                     //def selections = selectionsWithoutId(it, entity)
                     def associatedEntity = entity.getAssociations().find{ it.name == name }.associatedEntity
-                    (association, i) = _resultSetToEntities(associatedEntity, [], row, i, entities)
+                    (association, i) = _resultSetToEntities(associatedEntity, [], row, i, entities, format)
                     newEntity."$name" = association
                 }
             } else if(!name.startsWith('__')) {
                 newEntity."$name" = row[i]
+                if (row[i] instanceof Date) {
+                    String formatString = format ? format : row[i] instanceof Timestamp ? dateTimeFormat : dateFormat
+                    newEntity."$name".class.metaClass.formatDate { ->
+                        DateGroovyMethods.format(delegate as Date, formatString)
+                    }
+                }
                 i++
             }
         }
@@ -621,6 +635,7 @@ class GraphUtils {
                             argument(SIZE_ARG_NAME, GraphQLInt)
                             argument(SKIP_ARG_NAME, GraphQLInt)
                             argument(ORDERBY_ARG_NAME, list(GraphQLString))
+                            argument(FORMAT_ARG_NAME, GraphQLString)
                             fetcher { DataFetchingEnvironment env ->
                                 int max = env.getArgument(SIZE_ARG_NAME) ?: DEFAULT_SIZE
                                 max = max > MAX_SIZE ? MAX_SIZE : max
@@ -648,7 +663,8 @@ class GraphUtils {
                                             ])
                                     def count = criteriaList[0] as int
                                     def results = criteriaList[1] as Collection
-                                    def entities = resultSetToEntities(results, associatedEntity, selections)
+                                    String format = (env.getArgument(FORMAT_ARG_NAME) as String) ?: null
+                                    def entities = resultSetToEntities(results, associatedEntity, selections, format)
                                     new PagedGraphResults(entities
                                             , max, offset, count)
                                 } else {
@@ -723,6 +739,9 @@ class GraphUtils {
             case 'Date':
                 gtype = GraphQLDate
                 break
+            case 'Timestamp':
+                gtype = GraphQLDateTime
+                break
             default:
                 gtype = ScalarsAware.GraphQLString
                 break
@@ -730,17 +749,29 @@ class GraphUtils {
         gtype
     }
 
-    static GraphQLScalarType GraphQLDate = DSL.scalar('DateTime') {
+    static GraphQLScalarType GraphQLDate = DSL.scalar('Date') {
         serialize { Date date ->
-            DateGroovyMethods.format(date, dateTimeFormat)
+            date.formatDate()
+            //DateGroovyMethods.format(date, dateFormat)
         }
         parseLiteral { value ->
-            String dateString = value.value as String
-            dateString.contains(' ') ? dateTimeFormatter.parse(dateString) : dateFormatter.parse(dateString)
+            dateFormatter.parse(value.value as String)
         }
         parseValue { String value ->
-            String dateString = value as String
-            dateString.contains(' ') ? dateTimeFormatter.parse(dateString) : dateFormatter.parse(dateString)
+            dateFormatter.parse(value as String)
+        }
+    }
+
+    static GraphQLScalarType GraphQLDateTime = DSL.scalar('DateTime') {
+        serialize { Date date ->
+            date.formatDate()
+            //DateGroovyMethods.format(date, dateTimeFormat)
+        }
+        parseLiteral { value ->
+            dateTimeFormatter.parse(value.value as String)
+        }
+        parseValue { String value ->
+            dateTimeFormatter.parse(value as String)
         }
     }
 

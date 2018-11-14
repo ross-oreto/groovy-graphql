@@ -22,7 +22,7 @@ class PersonSpec extends GqlSpec {
 
     def "query people"() {
         setup:
-        String query = new Query(collectionName).size(50).page(Page.Info())
+        String query = new Query(collectionName).size(50).format('y-m-d').page(Page.Info())
                 .select('id', 'name', 'testDate', 'dateCreated')
                 .select(
                     new Query(AddressSpec.collectionName).size(20).skip(0).orderBy(['id']).select('id', 'line1')

@@ -39,6 +39,7 @@ class QueryBuilder {
             Integer size
             Integer skip
             Collection<String> orderBy
+            String format
         }
 
         Query filter(String filter) {
@@ -58,6 +59,11 @@ class QueryBuilder {
 
         Query orderBy(Collection<String> orderBy) {
             _getParams().orderBy = orderBy
+            this
+        }
+
+        Query format(String format) {
+            _getParams().format = format
             this
         }
 
@@ -97,6 +103,7 @@ class QueryBuilder {
                         args.add("${GraphUtils.ORDERBY_ARG_NAME}:[${params.orderBy.collect{ "\"$it\"" }.join(', ')}]")
                     else args.add("${GraphUtils.ORDERBY_ARG_NAME}:\"${params.orderBy[0]}\"")
                 }
+                if (params.format) args.add("${GraphUtils.FORMAT_ARG_NAME}:\"${params.format}\"")
                 sb.append(args.join(', ')).append(')').append(" {$ln")
             } else {
                 sb.append(tabs(i)).append(query.name).append(" {$ln")
